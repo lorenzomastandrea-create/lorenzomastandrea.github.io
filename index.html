@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lorenzo | Sito Personale</title>
+<style>
+  :root {
+    --azzurro-chiaro: #add8e6;
+    --azzurro: #7cc4e8;
+    --azzurro-scuro: #0284c7;
+    --sfondo: #e8f6fd;
+    --bianco: #ffffff;
+    --testo: #12394d;
+  }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background-color: var(--sfondo);
+    color: var(--testo);
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--azzurro-chiaro), var(--azzurro));
+    padding: 1rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  nav {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #083344;
+  }
+  .nav-links {
+    display: flex;
+    gap: 1.5rem;
+    list-style: none;
+  }
+  .nav-links a {
+    text-decoration: none;
+    color: #083344;
+    font-weight: 600;
+  }
+  .nav-links a:hover {
+    color: var(--azzurro-scuro);
+    text-decoration: underline;
+  }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .hero {
+    text-align: center;
+    background: var(--bianco);
+    border: 2px solid var(--azzurro-chiaro);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    color: var(--azzurro-scuro);
+    margin-bottom: 0.5rem;
+  }
+  .hero p {
+    font-size: clamp(1rem, 2.5vw, 1.25rem);
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+  }
+  .btn {
+    display: inline-block;
+    background-color: var(--azzurro-scuro);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    text-decoration: none;
+    font-weight: 700;
+  }
+  .btn:hover {
+    background-color: #0369a1;
+  }
+  .griglia {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  .scheda {
+    background: var(--bianco);
+    border: 1px solid var(--azzurro-chiaro);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .scheda h2 {
+    color: var(--azzurro-scuro);
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    background-color: var(--azzurro-chiaro);
+    margin-top: 2rem;
+    color: #083344;
+  }
+  @media (max-width: 768px) {
+    nav {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    main {
+      padding: 1rem;
+    }
+    .hero {
+      padding: 2rem 1rem;
+    }
+    .griglia {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <nav>
+    <div class="logo">Lorenzo</div>
+    <ul class="nav-links">
+      <li><a href="#home">Home</a></li>
+      <li><a href="#chi-sono">Chi Sono</a></li>
+      <li><a href="#contatti">Contatti</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="home">
+  <section class="hero">
+    <h1>Ciao, sono Lorenzo</h1>
+    <p>Benvenuto nel mio sito personale. Questo è uno spazio semplice, moderno e completamente responsivo nei toni dell'azzurro chiaro.</p>
+    <a class="btn" href="#chi-sono">Scopri di più</a>
+  </section>
+
+  <section class="griglia" id="chi-sono">
+    <div class="scheda">
+      <h2>Chi Sono</h2>
+      <p>Mi chiamo Lorenzo e amo creare progetti semplici ed eleganti per il web.</p>
+    </div>
+    <div class="scheda">
+      <h2>Le Mie Passioni</h2>
+      <p>Adoro il design minimalista, la tecnologia e il colore azzurro chiaro.</p>
+    </div>
+    <div class="scheda" id="contatti">
+      <h2>Contatti</h2>
+      <p>Scrivimi per collaborazioni o semplicemente per dire ciao!</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>&copy; 2026 Lorenzo — Tutti i diritti riservati</p>
+</footer>
+</body>
+</html>
