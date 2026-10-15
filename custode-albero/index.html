@@ -100,7 +100,7 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .stat{background:var(--edge);border-radius:14px;padding:12px 14px;display:grid;gap:2px}
 .stat b{font-family:var(--display);font-size:26px;font-weight:900;color:var(--sap);font-variant-numeric:tabular-nums}
-.shop{display:grid;gap:10px}
+.shop{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))}
 .item{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;background:var(--moss-2);border:2px solid var(--edge);border-radius:16px;padding:12px 14px}
 .item h3{margin:0;font-family:var(--display);font-weight:800;font-size:17px}
 .item p{font-size:13px;margin:2px 0 0}
@@ -133,6 +133,13 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
 .grow-info{display:grid;gap:4px;min-width:0;flex:1 1 220px}
 .grow-info b{color:#b8f27a}
 .grow-row p{color:var(--ink);font-size:14px}
+.card.r3{--r:var(--sap)}
+.skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(160px,100%),1fr));gap:12px}
+.skin{background:var(--moss-2);border:2px solid var(--edge);border-radius:18px;padding:10px;display:grid;gap:8px;justify-items:center;text-align:center;min-width:0}
+.skin.on{border-color:var(--sap);box-shadow:inset 0 0 0 2px var(--sap)}
+.skin canvas{position:static;inset:auto;width:120px;height:130px;border-radius:14px;background:radial-gradient(circle at 50% 62%,#3f6e47,#14291a)}
+.skin h3{margin:0;font-family:var(--display);font-weight:800;font-size:16px;line-height:1.15}
+.skin .btn{padding:8px 12px;font-size:14px;box-shadow:0 3px 0 var(--edge);width:100%}
 @media (max-width:520px){
   .hud{padding-block:8px}
   .hp-box{flex-basis:100%;max-width:none;order:3}
@@ -179,6 +186,7 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
       <div class="row" style="justify-content:center">
         <button class="btn primary" id="bPlay">Gioca</button>
         <button class="btn" id="bShopMenu">Bottega del bosco</button>
+        <button class="btn" id="bSkinsMenu">Guardaroba</button>
       </div>
       <p class="menu-meta">Record: ondata <b id="bestTxt">0</b> · Semi d'oro: <b id="mSeedTxt">0</b></p>
     </div>
@@ -227,6 +235,7 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
       <div class="row">
         <button class="btn primary" id="bRetry">Gioca ancora</button>
         <button class="btn leaf" id="bShopOver">Bottega del bosco</button>
+        <button class="btn" id="bSkinsOver">Guardaroba</button>
         <button class="btn" id="bMenu">Menu</button>
       </div>
     </div>
@@ -246,13 +255,40 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
       <div class="row"><button class="btn primary" id="bShopBack">Indietro</button></div>
     </div>
   </div>
+
+  <div class="overlay" id="world" hidden>
+    <div class="panel">
+      <div>
+        <p class="eyebrow">Albero del Mondo</p>
+        <h2>Scegli il potere dell'albero</h2>
+      </div>
+      <p>L'albero ha raggiunto la forma più alta. Puoi risvegliare uno solo di questi tre poteri, e resta attivo per tutta la partita.</p>
+      <div class="cards" id="worldCards"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="skins" hidden>
+    <div class="panel">
+      <div class="head">
+        <div>
+          <p class="eyebrow">Negozio del druido</p>
+          <h2>Guardaroba</h2>
+        </div>
+        <div class="purse"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f7bc3f" stroke="#0c1810" stroke-width="2" d="M12 2c4.5 5 7 9 7 13a7 7 0 0 1-14 0c0-4 2.5-8 7-13z"/></svg><span id="skinPurse" class="num">0</span></div>
+      </div>
+      <p>Le vesti cambiano l'aspetto del druido e il colore dei suoi semi. Si comprano una volta sola con i semi d'oro e restano tue.</p>
+      <div class="skins" id="skinList"></div>
+      <div class="row"><button class="btn primary" id="bSkinsBack">Indietro</button></div>
+    </div>
+  </div>
 </div>
 
 <script>
 (() => {
 'use strict';
 const $ = s => document.querySelector(s);
-const cv = $('#cv'), ctx = cv.getContext('2d'), app = $('#app');
+const cv = $('#cv'), app = $('#app');
+let ctx = cv.getContext('2d');
 const TAU = Math.PI * 2;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -263,11 +299,13 @@ const DISPLAY = "'Grandstander','Trebuchet MS',sans-serif";
 
 /* ---------- Salvataggio (solo in questo browser) ---------- */
 const KEY = 'custode-albero-v1';
-let meta = { seeds: 0, best: 0, lv: {} };
+let meta = { seeds: 0, best: 0, lv: {}, skins: ['bosco'], skin: 'bosco' };
 function loadMeta(data) {
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object') meta = Object.assign(meta, s); } catch (e) {}
   if (data && data.meta) meta = Object.assign(meta, data.meta);
   meta.lv = meta.lv || {};
+  if (!Array.isArray(meta.skins)) meta.skins = ['bosco'];
+  if (!meta.skins.includes(meta.skin)) meta.skin = 'bosco';
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(meta)); } catch (e) {} }
 const lv = id => meta.lv[id] || 0;
@@ -312,9 +350,17 @@ const ED = {
   vespa:     { name: 'Vespa',              hp: 11,  spd: 84,  dmg: 3,  r: 12, rate: .6,  seeds: 1,  from: 3, w: 6,  col: '#ffcf3d', fly: 1 },
   fungo:     { name: 'Fungo corrotto',     hp: 34,  spd: 40,  dmg: 7,  r: 17, rate: 2.2, seeds: 2,  from: 5, w: 4,  col: '#a65ad6', ranged: 215 },
   boscaiolo: { name: 'Boscaiolo oscuro',   hp: 110, spd: 45,  dmg: 16, r: 19, rate: 1.6, seeds: 5,  from: 7, w: 3,  col: '#4a4366' },
-  regina:    { name: 'Regina degli Sciami',hp: 600, spd: 25, dmg: 18, r: 36, rate: 1.3, seeds: 40, boss: 1, col: '#ffcf3d', fly: 1 },
+  lumaca:    { name: 'Lumaca acida',       hp: 80,  spd: 18,  dmg: 6,  r: 18, rate: 1.0, seeds: 3,  from: 4, w: 3,  col: '#b5d94a', armor: 1 },
+  ragno:     { name: 'Ragno saltatore',    hp: 28,  spd: 44,  dmg: 7,  r: 15, rate: .9,  seeds: 2,  from: 6, w: 4,  col: '#5b4636', leap: 1 },
+  talpa:     { name: 'Talpa scavatrice',   hp: 45,  spd: 40,  dmg: 10, r: 16, rate: 1.1, seeds: 3,  from: 9, w: 3,  col: '#8a6a45', burrow: 1 },
+  corvo:     { name: 'Corvo d\'ombra',     hp: 24,  spd: 70,  dmg: 6,  r: 15, rate: .8,  seeds: 2,  from: 11, w: 3, col: '#3a3d5c', fly: 1 },
+  regina:    { name: 'Regina degli Sciami',hp: 600, spd: 25,  dmg: 18, r: 36, rate: 1.3, seeds: 40, boss: 1, col: '#ffcf3d', fly: 1, summon: ['vespa', 3, 5] },
+  fungore:   { name: 'Re dei Funghi',      hp: 700, spd: 18,  dmg: 14, r: 40, rate: 1.6, seeds: 45, boss: 1, col: '#d0454c', ranged: 235, summon: ['fungo', 2, 7] },
+  madreragno:{ name: 'Madre Ragno',        hp: 760, spd: 28,  dmg: 22, r: 40, rate: 1.3, seeds: 50, boss: 1, col: '#7a3b4a', leap: 1, summon: ['ragno', 3, 6] },
+  taglialegna:{ name: 'Il Gran Taglialegna', hp: 1150, spd: 24, dmg: 40, r: 36, rate: 2.4, seeds: 60, boss: 1, col: '#a3302a', armor: 4 },
   treant:    { name: 'Treant Corrotto',    hp: 820, spd: 20,  dmg: 30, r: 44, rate: 2.2, seeds: 45, boss: 1, col: '#d77bff', armor: 3 },
 };
+const BOSSES = ['regina', 'fungore', 'madreragno', 'treant', 'taglialegna'];
 
 const ICON = {
   atk: '<svg viewBox="0 0 24 24"><path d="M12 2c4.5 5 7 9 7 13a7 7 0 0 1-14 0c0-4 2.5-8 7-13z"/></svg>',
@@ -350,18 +396,34 @@ const UPS = [
   { id: 'shield', cat: 'def',   r: 1, max: 4,  name: 'Bolla di rugiada',     desc: () => 'A ogni ondata uno scudo assorbe 30 danni in più.', apply: () => { P.shieldMax += 30; G.shield = P.shieldMax; } },
   { id: 'exec',   cat: 'atk',   r: 1, max: 3,  name: 'Falce del raccolto',   desc: () => 'I nemici colpiti sotto l\'8% di vita in più cadono subito.', apply: () => P.exec++ },
   { id: 'nova',   cat: 'magic', r: 2, max: 4,  name: 'Ira della foresta',    desc: () => 'Ogni pochi secondi l\'albero sprigiona un\'onda che ferisce e respinge i nemici.', apply: () => { P.nova++; G.novaCd = Math.min(G.novaCd, 2); } },
+  { id: 'spirit', cat: 'magic', r: 2, max: 3,  name: 'Spirito del bosco',    desc: () => 'Uno spirito luminoso affianca il druido e lancia semi con metà del danno.', apply: () => P.spirit++ },
+  { id: 'sun',    cat: 'magic', r: 1, max: 4,  name: 'Raggio di sole',       desc: () => 'Ogni pochi secondi un raggio di sole colpisce il nemico più forte.', apply: () => P.sun++ },
+  { id: 'frost',  cat: 'magic', r: 1, max: 4,  name: 'Brina del mattino',    desc: () => '12% di probabilità di congelare per 1 s il nemico colpito.', apply: () => P.frost++ },
+  { id: 'bees',   cat: 'magic', r: 1, max: 4,  name: 'Alveare amico',        desc: () => 'Ogni 6 s dalla chioma escono due api che inseguono i nemici.', apply: () => P.bees++ },
+  { id: 'ricochet',cat: 'atk',  r: 1, max: 3,  name: 'Seme rimbalzante',     desc: () => 'Dopo il colpo il seme rimbalza su un altro nemico vicino.', apply: () => P.ricochet++ },
+  { id: 'acorn',  cat: 'atk',   r: 1, max: 4,  name: 'Ghianda gigante',      desc: () => 'Ogni 5 lanci parte una ghianda enorme che fa danno triplo in area.', apply: () => P.acorn++ },
+  { id: 'giant',  cat: 'atk',   r: 0, max: 4,  name: 'Cacciatore di giganti',desc: () => '+30% danno contro boss e nemici corazzati.', apply: () => P.giant++ },
+  { id: 'wind',   cat: 'atk',   r: 0, max: 4,  name: 'Vento favorevole',     desc: () => 'Semi più veloci del 20% e +6% gittata.', apply: () => { P.pspd *= 1.2; P.range *= 1.06; } },
+  { id: 'fury',   cat: 'def',   r: 0, max: 4,  name: 'Furia della natura',   desc: () => '+35% danno quando l\'albero è sotto metà vita.', apply: () => P.fury++ },
+];
+
+const WORLD = [
+  { id: 'heart', cat: 'def',    name: 'Cuore di Yggdrasil', desc: 'Vita massima raddoppiata, cura completa e +5 vita al secondo.', apply: () => { P.maxHp *= 2; tree.hp = P.maxHp; P.regen += 5; } },
+  { id: 'stars', cat: 'magic',  name: 'Chioma di stelle',   desc: 'Ogni secondo una stella cade su un nemico e ferisce tutto intorno.', apply: () => { P.stars = 1; } },
+  { id: 'roots', cat: 'nature', name: 'Radici del mondo',   desc: 'Tutti i nemici sono più lenti del 30%, e chi si avvicina all\'albero perde vita ogni secondo.', apply: () => { P.worldRoots = 1; } },
 ];
 
 const TREE_LV = [
-  { name: 'Alberello',        sc: .8,  perk: '' },
-  { name: 'Giovane quercia',  sc: .88, cost: 20,  perk: '+35 vita, +12% danno, +15 gittata' },
-  { name: 'Quercia robusta',  sc: .96, cost: 42,  perk: 'come sopra, più 2 armatura' },
-  { name: 'Albero Antico',    sc: 1.03, cost: 78, perk: 'come sopra, più un seme in più a ogni colpo' },
-  { name: 'Albero Fatato',    sc: 1.1, cost: 135, perk: 'come sopra, più 2 vita al secondo' },
-  { name: 'Albero del Mondo', sc: 1.17, cost: 220, perk: 'come sopra, più un altro seme a ogni colpo' },
+  { name: 'Alberello',        sc: .75, perk: '' },
+  { name: 'Giovane quercia',  sc: .85, cost: 20,  perk: '+35 vita, +12% danno, +15 gittata' },
+  { name: 'Quercia robusta',  sc: .95, cost: 42,  perk: 'come sopra, più 2 armatura' },
+  { name: 'Albero Antico',    sc: 1.02, cost: 78, perk: 'come sopra, più un seme in più a ogni colpo' },
+  { name: 'Albero Fatato',    sc: 1.08, cost: 135, perk: 'come sopra, più 2 vita al secondo' },
+  { name: 'Albero del Mondo', sc: 1.15, cost: 220, perk: 'come sopra, più un altro seme e la scelta di un potere leggendario' },
 ];
 const treeSc = () => TREE_LV[G.treeLv - 1].sc;
 const treeR = () => TREE_R * treeSc();
+const evoCost = nx => Math.round(nx.cost * (1 - .08 * lv('evo')));
 
 const SHOP = [
   { id: 'hp',     name: 'Radici profonde',       desc: '+15 vita massima iniziale.',            base: 15, max: 10 },
@@ -371,6 +433,12 @@ const SHOP = [
   { id: 'armor',  name: 'Corteccia di pietra',   desc: 'Ogni colpo subito fa 1 danno in meno.', base: 45, max: 5 },
   { id: 'gold',   name: 'Favore della foresta',  desc: '+10% semi d\'oro in ogni partita.',     base: 35, max: 8 },
   { id: 'reroll', name: 'Seconda possibilità',   desc: '+1 rilancio delle carte dono per partita.', base: 60, max: 3 },
+  { id: 'crit',   name: 'Occhio antico',         desc: '+3% probabilità di critico.',            base: 25, max: 6 },
+  { id: 'range',  name: 'Sguardo lontano',       desc: '+5% gittata del druido.',                base: 25, max: 5 },
+  { id: 'evo',    name: 'Crescita rapida',       desc: 'Far crescere l\'albero costa l\'8% di linfa in meno.', base: 40, max: 5 },
+  { id: 'shieldp',name: 'Rugiada eterna',        desc: 'A ogni ondata si forma uno scudo da 15 danni.', base: 45, max: 5 },
+  { id: 'start',  name: 'Benedizione iniziale',  desc: 'Scegli un dono della foresta prima della prima ondata.', base: 120, max: 1 },
+  { id: 'multi',  name: 'Seme ancestrale',       desc: 'Il druido lancia un seme in più a ogni colpo, fin dall\'inizio.', base: 500, max: 1 },
   { id: 'sap',    name: 'Germoglio precoce',     desc: '+15 linfa a inizio partita, per far crescere l\'albero prima.', base: 30, max: 5 },
 ];
 const shopCost = it => Math.round(it.base * Math.pow(1.6, lv(it.id)));
@@ -384,13 +452,15 @@ const G = {
   fireCd: 0, rootCd: 3, aim: -Math.PI / 2, cast: 0, shake: 0, banner: null,
   ups: {}, rerolls: 0, choices: [], dmgDone: 0,
   sap: 0, treeLv: 1, evolveOpen: false, shield: 0, novaCd: 6,
+  spiritCd: 1, sunCd: 4, beeCd: 4, starCd: 1, shotCount: 0, worldReturn: 'play', worldPower: null,
 };
 function freshStats() {
   return {
-    dmg: 10 * (1 + .1 * lv('dmg')), rate: 1.3 * (1 + .06 * lv('rate')), range: 270, pspd: 560,
-    multi: 1, pierce: 0, crit: .05, maxHp: 120 + 15 * lv('hp'), regen: .5 * lv('regen'), armor: lv('armor'),
+    dmg: 10 * (1 + .1 * lv('dmg')), rate: 1.3 * (1 + .06 * lv('rate')), range: 270 * (1 + .05 * lv('range')), pspd: 560,
+    multi: 1 + lv('multi'), pierce: 0, crit: .05 + .03 * lv('crit'), maxHp: 120 + 15 * lv('hp'), regen: .5 * lv('regen'), armor: lv('armor'),
     thorns: 0, poison: 0, chain: 0, burst: 0, roots: 0, ff: 0, mist: 0, vamp: 0, gold: 1 + .1 * lv('gold'),
-    sapMul: 1, resin: 0, shieldMax: 0, exec: 0, nova: 0,
+    sapMul: 1, resin: 0, shieldMax: 15 * lv('shieldp'), exec: 0, nova: 0,
+    spirit: 0, sun: 0, frost: 0, ricochet: 0, acorn: 0, fury: 0, giant: 0, bees: 0, stars: 0, worldRoots: 0,
   };
 }
 
@@ -478,7 +548,7 @@ function glowSprite(col) {
   gr.addColorStop(0, col); gr.addColorStop(.35, col.replace(/[\d.]+\)$/, '.45)')); gr.addColorStop(1, col.replace(/[\d.]+\)$/, '0)'));
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return c;
 }
-const GLOW = { leaf: glowSprite('rgba(200,255,120,1)'), sap: glowSprite('rgba(255,210,90,1)'), fire: glowSprite('rgba(240,255,150,1)'), violet: glowSprite('rgba(210,130,255,1)'), pink: glowSprite('rgba(255,150,190,1)') };
+const GLOW = { leaf: glowSprite('rgba(200,255,120,1)'), sap: glowSprite('rgba(255,210,90,1)'), fire: glowSprite('rgba(240,255,150,1)'), violet: glowSprite('rgba(210,130,255,1)'), pink: glowSprite('rgba(255,150,190,1)'), ice: glowSprite('rgba(170,230,255,1)'), red: glowSprite('rgba(255,90,70,1)') };
 function glow(sp, x, y, size, a = 1) { ctx.globalAlpha = a; ctx.drawImage(sp, x - size / 2, y - size / 2, size, size); ctx.globalAlpha = 1; }
 
 /* ---------- Primitive di disegno ---------- */
@@ -494,58 +564,135 @@ function mix(a, b, t) {
 }
 
 /* ---------- Albero e druido ---------- */
-const CANOPY = [[-62, -58, 28], [62, -60, 28], [-46, -36, 38], [46, -36, 38], [0, -70, 48], [-30, -90, 34], [32, -92, 32], [0, -28, 44]];
 const BLOSSOMS = [[-50, -52], [38, -80], [-14, -98], [58, -40], [-28, -20], [18, -52], [-62, -70], [8, -14]];
-function drawTree() {
-  const hpF = clamp(tree.hp / P.maxHp, 0, 1), wither = 1 - hpF;
-  ell(0, 54, 100, 26, 0, 'rgba(10,30,12,.35)');
-  // radici
-  ctx.lineCap = 'round';
-  const roots = [[-1, 1.4, 70], [1, 1.4, 70], [-1, .5, 52], [1, .5, 52], [-.3, 1, 40], [.35, 1, 42]];
-  for (const [sx, k, len] of roots) {
-    ctx.strokeStyle = OUT; ctx.lineWidth = 12;
-    ctx.beginPath(); ctx.moveTo(sx * 10, 36); ctx.quadraticCurveTo(sx * len * .5, 44 + k * 4, sx * len, 50 + k * 6); ctx.stroke();
-    ctx.strokeStyle = '#7a4a2b'; ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.moveTo(sx * 10, 36); ctx.quadraticCurveTo(sx * len * .5, 44 + k * 4, sx * len, 50 + k * 6); ctx.stroke();
-  }
-  // tronco
+// Ogni livello dell'albero ha una forma propria: chioma, tronco, colori e dettagli
+const SHAPES = {
+  1: { blobs: [[0, -20, 26], [-19, -8, 17], [19, -8, 17], [0, -40, 16]], pal: ['#3f8a3a', '#62b04a', '#9ad86a'] },
+  2: { blobs: [[0, -40, 36], [-30, -24, 26], [30, -24, 26], [-15, -64, 24], [17, -64, 24], [0, -14, 26]], pal: ['#2f7a34', '#4fa443', '#86cf5a'] },
+  3: { blobs: [[-80, -26, 20], [80, -26, 20], [-58, -42, 30], [58, -42, 30], [-30, -58, 38], [30, -58, 38], [0, -68, 42], [0, -32, 40]], pal: ['#2d6e2c', '#468f38', '#7cbf4e'] },
+  4: { blobs: [[-62, -58, 28], [62, -60, 28], [-46, -36, 38], [46, -36, 38], [0, -70, 48], [-30, -90, 34], [32, -92, 32], [0, -28, 44]], pal: ['#24603a', '#3c8a4c', '#74bf6a'] },
+  5: { blobs: [[-70, -46, 24], [70, -48, 24], [-50, -26, 30], [50, -26, 30], [-38, -72, 34], [40, -74, 32], [0, -88, 40], [0, -46, 46], [-16, -112, 22], [22, -114, 20]], pal: ['#b0457f', '#e47aaa', '#ffc2db'] },
+  6: { blobs: [[-92, -30, 22], [92, -30, 22], [-66, -48, 34], [66, -48, 34], [0, -50, 50], [-36, -86, 40], [36, -86, 40], [0, -112, 42], [-22, -140, 26], [24, -142, 24], [0, -160, 20]], pal: ['#17705a', '#2ea57a', '#8ff0b5'] },
+};
+function canopy(blobs, pal, wither) {
+  const dark = mix(pal[0], '#6b5a2e', wither), mid = mix(pal[1], '#9a8a44', wither), light = mix(pal[2], '#c2ad62', wither);
+  for (const [x, y, r] of blobs) circ(x, y + 6, r + 3, OUT);
+  for (const [x, y, r] of blobs) circ(x, y + 4, r, dark);
+  for (const [x, y, r] of blobs) circ(x - 3, y - 2, r * .86, mid);
+  for (const [x, y, r] of blobs) circ(x - r * .3, y - r * .35, r * .38, light);
+  if (tree.flash > 0) { ctx.globalAlpha = tree.flash * 3; for (const [x, y, r] of blobs) circ(x, y, r, '#ff6a50'); ctx.globalAlpha = 1; }
+}
+function trunk(wb, wt, top, col, bend = 0) {
   ctx.beginPath();
-  ctx.moveTo(-28, 48); ctx.quadraticCurveTo(-16, 18, -22, -24); ctx.lineTo(22, -24); ctx.quadraticCurveTo(16, 18, 28, 48);
-  ctx.quadraticCurveTo(0, 56, -28, 48); ctx.closePath();
-  ctx.fillStyle = '#8a5530'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
-  ctx.strokeStyle = 'rgba(40,20,10,.45)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(-10, 40); ctx.quadraticCurveTo(-6, 18, -12, 0); ctx.moveTo(9, 44); ctx.quadraticCurveTo(12, 24, 8, 4); ctx.stroke();
-  // runa luminosa nel tronco
-  const pulse = .6 + Math.sin(G.t * 2.4) * .25;
-  glow(GLOW.leaf, 0, 18, 46, pulse * hpF + .15);
-  ctx.strokeStyle = mix('#c6ff7a', '#8a7a4a', wither); ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(0, 28); ctx.moveTo(-6, 14); ctx.lineTo(0, 20); ctx.lineTo(6, 14); ctx.stroke();
-  // chioma
-  const dark = mix('#2f7a34', '#6b5a2e', wither), mid = mix('#4fa443', '#9a8a44', wither), light = mix('#86cf5a', '#c2ad62', wither);
-  for (const [x, y, r] of CANOPY) circ(x, y + 6, r + 3, OUT);
-  for (const [x, y, r] of CANOPY) circ(x, y + 4, r, dark);
-  for (const [x, y, r] of CANOPY) circ(x - 3, y - 2, r * .86, mid);
-  for (const [x, y, r] of CANOPY) circ(x - r * .3, y - r * .35, r * .38, light);
-  // fiori
-  for (let i = 0; i < BLOSSOMS.length; i++) {
-    if (i / BLOSSOMS.length > hpF + .05) continue;
-    const [x, y] = BLOSSOMS[i];
-    for (let k = 0; k < 5; k++) { const a = k / 5 * TAU + i; circ(x + Math.cos(a) * 3.4, y + Math.sin(a) * 3.4, 2.8, '#ff9fc0'); }
-    circ(x, y, 2.2, '#ffd35a');
+  ctx.moveTo(-wb, 48); ctx.quadraticCurveTo(-wt * .8 + bend, (48 + top) / 2, -wt + bend, top); ctx.lineTo(wt + bend, top); ctx.quadraticCurveTo(wt * .8 + bend, (48 + top) / 2, wb, 48);
+  ctx.quadraticCurveTo(0, 56, -wb, 48); ctx.closePath();
+  ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+}
+function rootsDraw(list, col) {
+  ctx.lineCap = 'round';
+  for (const [sx, len, dy, w] of list) {
+    const path = () => { ctx.beginPath(); ctx.moveTo(sx * 8, 38); ctx.quadraticCurveTo(sx * len * .5, 44 + dy * .5, sx * len, 48 + dy); };
+    ctx.strokeStyle = OUT; ctx.lineWidth = w + 5; path(); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = w; path(); ctx.stroke();
   }
-  // frutti dorati quando l'albero cresce
-  if (G.treeLv >= 3) {
-    const fruits = [[-36, -62], [26, -40], [44, -78], [-8, -84], [-58, -36], [10, -110]].slice(0, (G.treeLv - 2) * 2);
-    for (const [x, y] of fruits) {
-      const by = y + Math.sin(G.t * 2 + x) * 1.2;
-      glow(GLOW.sap, x, by, 26, .55);
-      circ(x, by, 5.2, '#ffcf4a', OUT, 2); ell(x - 1.5, by - 2, 1.8, 1.1, 0, 'rgba(255,255,255,.75)');
+}
+function flower(x, y, petal, center, s = 1) {
+  for (let k = 0; k < 5; k++) { const a = k / 5 * TAU + x; circ(x + Math.cos(a) * 3.4 * s, y + Math.sin(a) * 3.4 * s, 2.8 * s, petal); }
+  circ(x, y, 2.2 * s, center);
+}
+function rune(x, y, col, hpF, size = 46) {
+  glow(GLOW.leaf, x, y, size, (.6 + Math.sin(G.t * 2.4) * .25) * hpF + .15);
+  ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y - 10); ctx.lineTo(x, y + 10); ctx.moveTo(x - 6, y - 4); ctx.lineTo(x, y + 2); ctx.lineTo(x + 6, y - 4); ctx.stroke();
+}
+function star(x, y, r, col) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? r * .45 : r; ctx.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+  ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = OUT; ctx.stroke();
+}
+function drawTree() {
+  const L = G.treeLv, hpF = clamp(tree.hp / P.maxHp, 0, 1), wither = 1 - hpF, sh = SHAPES[L];
+  const runeCol = mix('#c6ff7a', '#8a7a4a', wither);
+  ell(0, 54, [0, 46, 66, 100, 100, 108, 132][L], 22, 0, 'rgba(10,30,12,.35)');
+  if (L === 1) {
+    // Alberello: un fusto sottile e una chioma tonda
+    rootsDraw([[-1, 22, 2, 4], [1, 22, 2, 4]], '#8a5530');
+    trunk(8, 5, -6, '#8a5530');
+    ctx.strokeStyle = OUT; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(2, 22); ctx.quadraticCurveTo(14, 14, 20, 4); ctx.stroke();
+    ctx.strokeStyle = '#8a5530'; ctx.lineWidth = 3; ctx.stroke();
+    canopy(sh.blobs, sh.pal, wither);
+    ell(22, 2, 7, 3.5, -.5, '#8fd05f', OUT, 1.6);
+    if (hpF > .3) flower(-8, -26, '#ffffff', '#ffd35a', .8);
+  } else if (L === 2) {
+    // Giovane quercia: chioma ovale e fiori bianchi
+    rootsDraw([[-1, 40, 4, 6], [1, 40, 4, 6], [-.4, 28, 6, 5]], '#7a4a2b');
+    trunk(16, 12, -14, '#8a5530');
+    rune(0, 20, runeCol, hpF, 34);
+    canopy(sh.blobs, sh.pal, wither);
+    [[-20, -40], [22, -30], [4, -66], [-34, -18]].forEach(([x, y], i) => { if (i / 4 <= hpF + .05) flower(x, y, '#ffffff', '#ffd35a'); });
+  } else if (L === 3) {
+    // Quercia robusta: chioma larga, rami aperti e ghiande
+    rootsDraw([[-1, 70, 6, 8], [1, 70, 6, 8], [-1, 48, 0, 7], [1, 48, 0, 7]], '#6e4227');
+    trunk(30, 24, -20, '#7a4a2b');
+    ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { ctx.strokeStyle = OUT; ctx.lineWidth = 13; ctx.beginPath(); ctx.moveTo(s * 14, -6); ctx.quadraticCurveTo(s * 40, -16, s * 62, -30); ctx.stroke(); ctx.strokeStyle = '#7a4a2b'; ctx.lineWidth = 8; ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(40,20,10,.45)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-12, 42); ctx.quadraticCurveTo(-6, 18, -14, -4); ctx.moveTo(10, 44); ctx.quadraticCurveTo(14, 22, 8, 0); ctx.stroke();
+    rune(0, 20, runeCol, hpF);
+    canopy(sh.blobs, sh.pal, wither);
+    const acorns = [[-50, -30], [42, -40], [-14, -74], [20, -20], [-74, -18], [70, -16]];
+    acorns.forEach(([x, y], i) => { if (i / acorns.length > hpF + .1) return; ell(x, y + 3, 4.5, 5.5, 0, '#b5793c', OUT, 1.6); ell(x, y - 2, 5.5, 3, 0, '#6b4a2b', OUT, 1.6); });
+  } else if (L === 4) {
+    // Albero Antico: tronco con un volto addormentato e muschio che pende
+    rootsDraw([[-1, 76, 8, 8], [1, 76, 8, 8], [-1, 54, 0, 7], [1, 54, 0, 7], [-.3, 42, 8, 6], [.35, 44, 8, 6]], '#6a4128');
+    trunk(30, 22, -24, '#6e4a33', 3);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(-9, 8, 5, .2, Math.PI - .2); ctx.moveTo(14, 8); ctx.arc(9, 8, 5, .2, Math.PI - .2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, 26); ctx.quadraticCurveTo(0, 30, 6, 26); ctx.stroke();
+    rune(0, 40, runeCol, hpF, 34);
+    canopy(sh.blobs, sh.pal, wither);
+    ctx.lineWidth = 3; ctx.strokeStyle = mix('#a6d36a', '#8a7a4a', wither);
+    for (const [x, y, l] of [[-60, -34, 26], [-34, -10, 20], [44, -14, 24], [66, -36, 18], [12, -2, 14]]) {
+      const sw = Math.sin(G.t * 1.6 + x) * 3;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + sw, y + l * .6, x + sw * 1.5, y + l); ctx.stroke();
     }
-  }
-  if (tree.flash > 0) {
-    ctx.globalAlpha = tree.flash * 3;
-    for (const [x, y, r] of CANOPY) circ(x, y, r, '#ff6a50');
-    ctx.globalAlpha = 1;
+    BLOSSOMS.forEach(([x, y], i) => { if (i / BLOSSOMS.length <= hpF + .05) flower(x, y, '#ff9fc0', '#ffd35a'); });
+  } else if (L === 5) {
+    // Albero Fatato: corteccia lilla, chioma di fiori rosa, funghi luminosi e scintille
+    rootsDraw([[-1, 80, 8, 8], [1, 80, 8, 8], [-1, 56, 0, 7], [1, 56, 0, 7]], '#8c7aa0');
+    trunk(26, 18, -30, '#a891bd', -2);
+    ctx.strokeStyle = 'rgba(60,40,80,.4)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-10, 44); ctx.quadraticCurveTo(-2, 10, -10, -20); ctx.moveTo(8, 44); ctx.quadraticCurveTo(14, 16, 6, -16); ctx.stroke();
+    for (const [x, y, c] of [[-44, 52, '#7fd9ff'], [-30, 58, '#c993ff'], [40, 54, '#7fd9ff'], [54, 48, '#ff9fc0']]) {
+      glow(GLOW.ice, x, y - 4, 24, .6);
+      rr(x - 2, y - 4, 4, 8, 2); ctx.fillStyle = '#f1e2c6'; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x, y - 4, 7, 5, 0, Math.PI, TAU); ctx.closePath(); ctx.fillStyle = c; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OUT; ctx.stroke();
+    }
+    rune(0, 20, '#ffd1ec', hpF, 40);
+    canopy(sh.blobs, sh.pal, wither);
+    for (let i = 0; i < 7; i++) {
+      const a = G.t * .6 + i * .9, x = Math.cos(a) * (60 + i * 6), y = -60 + Math.sin(a * 1.3) * 50;
+      glow(GLOW.pink, x, y, 20, .7); circ(x, y, 2, '#ffffff');
+    }
+    [[-40, -60], [30, -40], [-8, -100], [52, -64], [-60, -30], [12, -70], [-24, -30]].forEach(([x, y], i) => { if (i / 7 <= hpF + .05) flower(x, y, '#ffffff', '#ffd35a', .9); });
+  } else {
+    // Albero del Mondo: tronco a spirale, cuore di luce, chioma a più piani, foglie d'oro e stelle
+    rootsDraw([[-1, 100, 6, 10], [1, 100, 6, 10], [-1, 70, -4, 9], [1, 70, -4, 9], [-.5, 54, 10, 8], [.5, 54, 10, 8], [-.2, 40, 12, 6], [.2, 40, 12, 6]], '#7a5232');
+    trunk(34, 22, -40, '#8a5f3a');
+    ctx.strokeStyle = '#5e3d22'; ctx.lineWidth = 3;
+    ctx.beginPath(); for (let i = 0; i <= 30; i++) { const t = i / 30, y = 46 - t * 80, x = Math.sin(t * 10) * (22 - t * 8); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    glow(GLOW.sap, 0, 10, 70, .6 + Math.sin(G.t * 2) * .2);
+    ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(8, 10); ctx.lineTo(0, 22); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fillStyle = '#ffe58a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.stroke();
+    canopy(sh.blobs, sh.pal, wither);
+    [[-60, -40], [50, -60], [-20, -100], [24, -128], [-70, -24], [80, -22], [0, -72], [-40, -76], [40, -96]].forEach(([x, y], i) => {
+      if (i / 9 > hpF + .1) return;
+      const by = y + Math.sin(G.t * 2 + x) * 1.2;
+      glow(GLOW.sap, x, by, 22, .5); ell(x, by, 5, 3, x * .1, '#ffd84a', OUT, 1.5);
+    });
+    for (let i = 0; i < 5; i++) {
+      const a = G.t * .8 + i * TAU / 5, x = Math.cos(a) * 110, y = -80 + Math.sin(a) * 40;
+      glow(GLOW.sap, x, y, 26, .8); star(x, y, 5, '#fff2a0');
+    }
   }
 }
 const DRUID = { x: 0, y: 66 };
@@ -554,35 +701,77 @@ function staffTip() {
   const hx = DRUID.x + 13, hy = DRUID.y - 4;
   return [hx + Math.sin(lean) * 40, hy - Math.cos(lean) * 40, lean, hx, hy];
 }
-function drawDruid() {
+const SKINS = [
+  { id: 'bosco',   name: 'Druido del bosco',     cost: 0,   robe: '#3e8e4b', robe2: '#2b6b37', hood: '#2f7a3b', face: '#f2c79b', beard: '#f4f1ea', staff: '#a0683a', gem: '#d9ff8f', glow: 'leaf',   shot: '#d8ff7a', hat: 'leaf' },
+  { id: 'autunno', name: 'Druido d\'autunno',    cost: 150, robe: '#c8662b', robe2: '#9a4520', hood: '#a8501f', face: '#f2c79b', beard: '#e8d9c0', staff: '#7a4a2b', gem: '#ffb35a', glow: 'sap',    shot: '#ffc06a', hat: 'maple' },
+  { id: 'brina',   name: 'Druida della brina',   cost: 250, robe: '#5fa8d8', robe2: '#3c7fb0', hood: '#e8f4ff', face: '#f6dcc8', beard: '#ffffff', staff: '#cfe8f5', gem: '#bff1ff', glow: 'ice',    shot: '#c8f4ff', hat: 'flake' },
+  { id: 'notte',   name: 'Sciamano della notte', cost: 400, robe: '#4a3a7a', robe2: '#2f2456', hood: '#3a2c66', face: '#d9b08c', beard: '#cfc8e8', staff: '#2b2238', gem: '#e0a8ff', glow: 'violet', shot: '#e7b8ff', hat: 'moon' },
+  { id: 'fungo',   name: 'Mago dei funghi',      cost: 550, robe: '#8a5a3a', robe2: '#6b4228', hood: '#d0454c', face: '#f2c79b', beard: '#f4f1ea', staff: '#e9dcc0', gem: '#ff9fc0', glow: 'pink',   shot: '#ffb3cf', hat: 'mushroom' },
+  { id: 'sole',    name: 'Sacerdote del sole',   cost: 800, robe: '#f3e3b0', robe2: '#d9b75a', hood: '#f7bc3f', face: '#c98e62', beard: '#fff6dc', staff: '#f7bc3f', gem: '#fff2a0', glow: 'sap',    shot: '#fff09a', hat: 'sun' },
+];
+const skin = () => SKINS.find(s => s.id === meta.skin) || SKINS[0];
+function drawDruid(sk = skin()) {
   const bob = Math.sin(G.t * 3) * 1.5;
   ctx.save(); ctx.translate(DRUID.x, DRUID.y + bob);
   ell(0, 28 - bob, 20, 6, 0, 'rgba(10,30,12,.35)');
+  if (sk.hat === 'sun') {
+    glow(GLOW.sap, 0, -20, 64, .55);
+    ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + G.t * .5; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 17, -20 + Math.sin(a) * 17); ctx.lineTo(Math.cos(a) * 24, -20 + Math.sin(a) * 24); ctx.stroke(); }
+  }
   // tunica
   ctx.beginPath(); ctx.moveTo(-17, 26); ctx.quadraticCurveTo(-14, 0, -4, -10); ctx.lineTo(4, -10); ctx.quadraticCurveTo(14, 0, 17, 26); ctx.quadraticCurveTo(0, 30, -17, 26); ctx.closePath();
-  ctx.fillStyle = '#3e8e4b'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
-  ctx.fillStyle = '#2b6b37'; ctx.beginPath(); ctx.moveTo(-16, 21); ctx.quadraticCurveTo(0, 26, 16, 21); ctx.lineTo(17, 26); ctx.quadraticCurveTo(0, 30, -17, 26); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = sk.robe; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+  ctx.fillStyle = sk.robe2; ctx.beginPath(); ctx.moveTo(-16, 21); ctx.quadraticCurveTo(0, 26, 16, 21); ctx.lineTo(17, 26); ctx.quadraticCurveTo(0, 30, -17, 26); ctx.closePath(); ctx.fill();
   rr(-11, 6, 22, 4, 2); ctx.fillStyle = '#7a4a2b'; ctx.fill();
   circ(0, 8, 2.6, '#f7bc3f', OUT, 1.5);
   // cappuccio e volto
-  ctx.beginPath(); ctx.moveTo(-13, -10); ctx.quadraticCurveTo(-14, -30, 0, -34); ctx.quadraticCurveTo(14, -30, 13, -10); ctx.closePath();
-  ctx.fillStyle = '#2f7a3b'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
-  circ(0, -18, 8.5, '#f2c79b');
-  ctx.beginPath(); ctx.moveTo(-8, -16); ctx.quadraticCurveTo(0, 2, 8, -16); ctx.quadraticCurveTo(0, -12, -8, -16); ctx.fillStyle = '#f4f1ea'; ctx.fill(); ctx.lineWidth = 1.5; ctx.stroke();
+  if (sk.hat !== 'mushroom') {
+    ctx.beginPath(); ctx.moveTo(-13, -10); ctx.quadraticCurveTo(-14, -30, 0, -34); ctx.quadraticCurveTo(14, -30, 13, -10); ctx.closePath();
+    ctx.fillStyle = sk.hood; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+  circ(0, -18, 8.5, sk.face);
+  ctx.beginPath(); ctx.moveTo(-8, -16); ctx.quadraticCurveTo(0, 2, 8, -16); ctx.quadraticCurveTo(0, -12, -8, -16); ctx.fillStyle = sk.beard; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OUT; ctx.stroke();
   circ(-3.2, -20, 1.5, OUT); circ(3.2, -20, 1.5, OUT);
-  ctx.strokeStyle = '#f4f1ea'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, -24); ctx.lineTo(-1.5, -23); ctx.moveTo(6, -24); ctx.lineTo(1.5, -23); ctx.stroke();
-  // fogliolina sul cappuccio
-  ell(5, -34, 6, 3, -.6, '#8fd05f', OUT, 1.5);
+  ctx.strokeStyle = sk.beard; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, -24); ctx.lineTo(-1.5, -23); ctx.moveTo(6, -24); ctx.lineTo(1.5, -23); ctx.stroke();
+  // accessorio della veste
+  if (sk.hat === 'leaf') ell(5, -34, 6, 3, -.6, '#8fd05f', OUT, 1.5);
+  else if (sk.hat === 'maple') star(6, -33, 6.5, '#e8572a');
+  else if (sk.hat === 'flake') {
+    ctx.strokeStyle = '#3c7fb0'; ctx.lineWidth = 1.8;
+    for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(4 + Math.cos(a) * 5, -29 + Math.sin(a) * 5); ctx.lineTo(4 - Math.cos(a) * 5, -29 - Math.sin(a) * 5); ctx.stroke(); }
+  } else if (sk.hat === 'moon') { circ(5, -30, 5.5, '#ffd84a', OUT, 1.5); circ(7.5, -32, 4.6, sk.hood); star(-6, -27, 2.6, '#fff2a0'); }
+  else if (sk.hat === 'mushroom') {
+    ctx.beginPath(); ctx.ellipse(0, -23, 17, 14, 0, Math.PI, TAU); ctx.closePath(); ctx.fillStyle = sk.hood; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+    circ(-7, -30, 2.8, '#ffffff'); circ(5, -33, 3.2, '#ffffff'); circ(11, -26, 2, '#ffffff');
+  }
   ctx.restore();
   // bastone
   const [tx, ty, , hx, hy] = staffTip();
   ctx.lineCap = 'round';
   ctx.strokeStyle = OUT; ctx.lineWidth = 6.5; ctx.beginPath(); ctx.moveTo(hx - (tx - hx) * .35, hy + bob - (ty - hy) * .35); ctx.lineTo(tx, ty + bob); ctx.stroke();
-  ctx.strokeStyle = '#a0683a'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(hx - (tx - hx) * .35, hy + bob - (ty - hy) * .35); ctx.lineTo(tx, ty + bob); ctx.stroke();
-  circ(hx, hy + bob, 4, '#f2c79b', OUT, 2);
+  ctx.strokeStyle = sk.staff; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(hx - (tx - hx) * .35, hy + bob - (ty - hy) * .35); ctx.lineTo(tx, ty + bob); ctx.stroke();
+  circ(hx, hy + bob, 4, sk.face, OUT, 2);
   const c = G.cast > 0 ? 1 : .55 + Math.sin(G.t * 4) * .15;
-  glow(GLOW.leaf, tx, ty + bob, 26 + c * 22, c);
-  circ(tx, ty + bob, 4.6, '#d9ff8f', OUT, 2);
+  glow(GLOW[sk.glow] || GLOW.leaf, tx, ty + bob, 26 + c * 22, c);
+  circ(tx, ty + bob, 4.6, sk.gem, OUT, 2);
+}
+function drawSpirit() {
+  const [x, y] = spiritPos();
+  glow(GLOW.ice, x, y, 46, .8);
+  ctx.beginPath(); ctx.moveTo(x - 9, y); ctx.quadraticCurveTo(x - 9, y - 12, x, y - 12); ctx.quadraticCurveTo(x + 9, y - 12, x + 9, y);
+  ctx.quadraticCurveTo(x + 6, y + 6, x + 3 + Math.sin(G.t * 6) * 2, y + 12); ctx.quadraticCurveTo(x, y + 6, x - 3, y + 10); ctx.quadraticCurveTo(x - 7, y + 6, x - 9, y); ctx.closePath();
+  ctx.fillStyle = '#e6fbff'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.stroke();
+  circ(x - 3, y - 4, 1.6, OUT); circ(x + 3, y - 4, 1.6, OUT);
+}
+function drawSkinPreview(cnv, sk) {
+  const d = Math.min(2, window.devicePixelRatio || 1), w = 120, h = 130, k = 1.45;
+  cnv.width = w * d; cnv.height = h * d;
+  const saved = ctx, aim = G.aim, cast = G.cast;
+  ctx = cnv.getContext('2d');
+  ctx.setTransform(d * k, 0, 0, d * k, d * w / 2, d * (h / 2 - 60 * k));
+  G.aim = -Math.PI / 2 + .5; G.cast = 0;
+  try { drawDruid(sk); } finally { ctx = saved; G.aim = aim; G.cast = cast; }
 }
 
 /* ---------- Nemici ---------- */
@@ -633,7 +822,7 @@ function drawVespa(e, f, scale = 1, crown = false) {
     ctx.restore();
   }
 }
-function drawFungo(e, f) {
+function drawFungo(e, f, cap = '#9b4dca') {
   const bob = e.moving ? Math.abs(Math.sin(e.t * 8)) * 3 : 0;
   const sq = e.lunge > 0 ? 1 + e.lunge * 1.5 : 1;
   ctx.translate(0, -bob); ctx.scale(sq, 2 - sq);
@@ -641,12 +830,16 @@ function drawFungo(e, f) {
   rr(-9, -2, 18, 17, 6); ctx.fillStyle = f || '#f1e2c6'; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = OUT; ctx.stroke();
   ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, 3); ctx.lineTo(-2, 5); ctx.moveTo(6, 3); ctx.lineTo(2, 5); ctx.stroke();
   circ(-3.5, 7, 1.6, OUT); circ(3.5, 7, 1.6, OUT);
-  ctx.beginPath(); ctx.ellipse(0, 0, 21, 17, 0, Math.PI, TAU); ctx.closePath(); ctx.fillStyle = f || '#9b4dca'; ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, 0, 21, 17, 0, Math.PI, TAU); ctx.closePath(); ctx.fillStyle = f || cap; ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke();
   circ(-9, -7, 3.4, '#f6e9ff'); circ(5, -11, 4, '#f6e9ff'); circ(13, -4, 2.4, '#f6e9ff'); circ(-1, -4, 1.8, '#f6e9ff');
 }
-function drawBoscaiolo(e, f) {
+function drawBoscaiolo(e, f, chief = false) {
   const dir = e.x > 0 ? -1 : 1, bob = e.moving ? Math.abs(Math.sin(e.t * 9)) * 2 : 0;
   ctx.scale(dir, 1); ctx.translate(0, -bob);
+  if (chief) {
+    ctx.beginPath(); ctx.moveTo(-7, -10); ctx.quadraticCurveTo(-22, 4, -18, 20); ctx.lineTo(10, 18); ctx.lineTo(8, -10); ctx.closePath();
+    ctx.fillStyle = f || '#a3302a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.stroke();
+  }
   const step = e.moving ? Math.sin(e.t * 9) * 3 : 0;
   rr(-7 + step, 10, 5, 9, 2); ctx.fillStyle = '#231e2e'; ctx.fill();
   rr(2 - step, 10, 5, 9, 2); ctx.fill();
@@ -696,7 +889,75 @@ function drawTreant(e, f) {
   ctx.beginPath(); ctx.moveTo(-12, 6); ctx.lineTo(-6, 2); ctx.lineTo(-2, 8); ctx.lineTo(3, 2); ctx.lineTo(8, 8); ctx.lineTo(12, 4); ctx.lineTo(10, 14); ctx.lineTo(-10, 14); ctx.closePath();
   ctx.fillStyle = '#1a0f1f'; ctx.fill();
 }
-const DRAW = { formica: drawFormica, scarabeo: drawScarabeo, vespa: (e, f) => drawVespa(e, f), fungo: drawFungo, boscaiolo: drawBoscaiolo, treant: drawTreant, regina: (e, f) => drawVespa(e, f, 2.6, true) };
+function crown(x, y, s = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.moveTo(-8, 4); ctx.lineTo(-9, -6); ctx.lineTo(-4, -1); ctx.lineTo(0, -9); ctx.lineTo(4, -1); ctx.lineTo(9, -6); ctx.lineTo(8, 4); ctx.closePath();
+  ctx.fillStyle = '#ffd84a'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OUT; ctx.stroke();
+  circ(0, 0, 1.6, '#ff5a7a'); ctx.restore();
+}
+function drawRagno(e, f, big = false) {
+  ctx.rotate(e.a); ctx.translate(e.lunge * 30, 0);
+  const sw = e.moving ? Math.sin(e.t * (e.leapT > 0 ? 30 : 16)) : 0;
+  ctx.strokeStyle = OUT; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const ax = -3 + i * 3, k = (i % 2 ? 1 : -1) * sw * 3;
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(ax, 0); ctx.quadraticCurveTo(ax + (i - 1.5) * 7, s * 15, ax + (i - 1.5) * 10 + k, s * 21); ctx.stroke(); }
+  }
+  ell(-9, 0, 11, 9, 0, f || (big ? '#5a2a3a' : '#5b4636'), OUT, 2);
+  circ(5, 0, 7, f || (big ? '#4a1f2c' : '#4a382b'), OUT, 2);
+  ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-9, -3.5); ctx.lineTo(-4, 0); ctx.lineTo(-9, 3.5); ctx.closePath(); ctx.fillStyle = big ? '#c993ff' : '#e0453a'; ctx.fill();
+  const eye = big ? '#ff5a7a' : '#ffffff';
+  circ(10, -2, 1.5, eye); circ(10, 2, 1.5, eye); circ(8.5, -4.2, 1.1, eye); circ(8.5, 4.2, 1.1, eye);
+  if (big) glow(GLOW.red, 10, 0, 18, .6);
+}
+function drawLumaca(e, f) {
+  const dir = e.x > 0 ? -1 : 1, st = Math.sin(e.t * 4) * 1.5, str = e.moving ? 1 + Math.sin(e.t * 3) * .05 : 1;
+  ctx.scale(dir * str, 1);
+  ctx.beginPath(); ctx.moveTo(-24, 13); ctx.quadraticCurveTo(-26, 4, -12, 5); ctx.lineTo(14, 3); ctx.quadraticCurveTo(25, 1, 25, 10); ctx.quadraticCurveTo(25, 15, 18, 15); ctx.closePath();
+  ctx.fillStyle = f || '#b5d94a'; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = OUT; ctx.stroke();
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(19, 4); ctx.lineTo(23 + st, -10); ctx.moveTo(15, 4); ctx.lineTo(16 + st, -12); ctx.stroke();
+  circ(23 + st, -11, 3, '#ffffff', OUT, 1.5); circ(16 + st, -13, 3, '#ffffff', OUT, 1.5); circ(24 + st, -11, 1.2, OUT); circ(17 + st, -13, 1.2, OUT);
+  circ(-4, -4, 13, f || '#8e5a9e', OUT, 2.5);
+  ctx.strokeStyle = 'rgba(40,10,50,.6)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(-4, -4, 8, .5, 5.2); ctx.stroke(); ctx.beginPath(); ctx.arc(-3, -4, 4, .8, 5); ctx.stroke();
+  ell(-9, -11, 4, 2, -.5, 'rgba(255,255,255,.4)');
+}
+function drawTalpa(e, f) {
+  if (e.under) {
+    const w = Math.sin(e.t * 10) * 1.5;
+    ell(0, 6, 17, 9, 0, '#6b4a2b', OUT, 2); circ(-7 + w, 2, 3, '#8a6a45'); circ(6, -w, 2.5, '#8a6a45'); circ(0, 4, 2, '#9a7a55');
+    return;
+  }
+  const dir = e.x > 0 ? -1 : 1; ctx.scale(dir, 1);
+  ell(0, 12, 19, 6, 0, '#3b2a1a');
+  ell(0, 0, 15, 14, 0, f || '#6e5a4a', OUT, 2.2);
+  ell(3, 4, 8, 7, 0, f || '#a08670');
+  circ(14, -2, 4, '#ff9fb0', OUT, 1.5);
+  ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(4, -6); ctx.lineTo(8, -5); ctx.stroke();
+  const dig = e.lunge > 0 ? 4 : Math.sin(e.t * 12) * 1.5;
+  ell(12, 8 + dig, 5, 3, .4, '#ffb3c0', OUT, 1.5); ell(-8, 9 - dig, 5, 3, -.4, '#ffb3c0', OUT, 1.5);
+}
+function drawCorvo(e, f) {
+  ctx.rotate(e.a); ctx.translate(e.lunge * 30, 0);
+  const fl = Math.sin(e.t * 14);
+  for (const s of [-1, 1]) {
+    ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(-4, s * (20 + fl * 6)); ctx.lineTo(-12, s * (17 + fl * 4)); ctx.lineTo(-9, 0); ctx.closePath();
+    ctx.fillStyle = f || '#2b2e4a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(-22, -6); ctx.lineTo(-20, 0); ctx.lineTo(-22, 6); ctx.closePath(); ctx.fillStyle = f || '#2b2e4a'; ctx.fill(); ctx.stroke();
+  ell(-2, 0, 13, 7, 0, f || '#3a3d5c', OUT, 2);
+  circ(10, 0, 6, f || '#3a3d5c', OUT, 2);
+  ctx.beginPath(); ctx.moveTo(15, -2.5); ctx.lineTo(23, 0); ctx.lineTo(15, 2.5); ctx.closePath(); ctx.fillStyle = '#f7bc3f'; ctx.fill(); ctx.lineWidth = 1.5; ctx.stroke();
+  circ(11, -2.6, 1.6, '#ff4d4d'); circ(11, 2.6, 1.6, '#ff4d4d');
+}
+const DRAW = {
+  formica: drawFormica, scarabeo: drawScarabeo, vespa: (e, f) => drawVespa(e, f), fungo: (e, f) => drawFungo(e, f), boscaiolo: (e, f) => drawBoscaiolo(e, f),
+  lumaca: drawLumaca, ragno: (e, f) => drawRagno(e, f), talpa: drawTalpa, corvo: drawCorvo,
+  treant: drawTreant, regina: (e, f) => drawVespa(e, f, 2.6, true),
+  fungore: (e, f) => { ctx.scale(2.2, 2.2); drawFungo(e, f, '#d0454c'); crown(0, -15, .9); },
+  madreragno: (e, f) => { ctx.scale(2.3, 2.3); drawRagno(e, f, true); },
+  taglialegna: (e, f) => { ctx.scale(2, 2); drawBoscaiolo(e, f, true); },
+};
 
 /* ---------- Logica ---------- */
 function spawnEnemy(type, x, y) {
@@ -705,7 +966,8 @@ function spawnEnemy(type, x, y) {
   if (x === undefined) [x, y] = spawnPoint();
   const e = { type, d, x, y, vx: 0, vy: 0, hp: d.hp * hpM, max: d.hp * hpM, spd: d.spd * rnd(.9, 1.1), dmg: d.dmg * dmM, r: d.r,
     atk: rnd(.1, d.rate), flash: 0, slow: 0, psn: 0, psnT: 0, ffCd: 0, t: Math.random() * 10, lunge: 0, dead: false, moving: true,
-    armor: (d.armor || 0) * (1 + w * .05), dist: Math.hypot(x, y), a: Math.atan2(-y, -x), sumCd: 4 };
+    armor: (d.armor || 0) * (1 + w * .05), dist: Math.hypot(x, y), a: Math.atan2(-y, -x), sumCd: d.summon ? d.summon[2] * .6 : 4,
+    under: !!d.burrow, leapCd: rnd(1, 2.5), leapT: 0, frozen: 0, resinT: 0, enraged: false };
   G.enemies.push(e); return e;
 }
 function startWave() {
@@ -717,7 +979,7 @@ function startWave() {
   for (let i = 0; i < n; i++) { let r = Math.random() * tot; for (const [k, d] of pool) { r -= d.w; if (r <= 0) { list.push(k); break; } } }
   const fresh = pool.find(([, d]) => d.from === w);
   if (w % 5 === 0) {
-    const b = (w / 5) % 2 === 1 ? 'regina' : 'treant';
+    const b = BOSSES[(w / 5 - 1) % BOSSES.length];
     list.splice(Math.floor(list.length * .25), 0, b);
     G.banner = { t: 2.6, max: 2.6, text: ED[b].name, sub: 'Un boss esce dal bosco', boss: true };
     play('boss', 0);
@@ -728,23 +990,52 @@ function startWave() {
   G.shield = P.shieldMax;
 }
 function nearestTargets(n) {
-  const inR = G.enemies.filter(e => !e.dead && e.dist <= P.range);
+  const inR = G.enemies.filter(e => !e.dead && !e.under && e.dist <= P.range);
   inR.sort((a, b) => a.dist - b.dist);
   return inR.slice(0, n);
 }
+function spiritPos() { return [-50, 38 + Math.sin(G.t * 2.2) * 6]; }
 function fire(targets) {
-  const [tx, ty] = staffTip();
+  const [tx, ty] = staffTip(), sk = skin();
   G.cast = .15;
+  G.shotCount++;
+  const big = P.acorn && G.shotCount % 5 === 0;
   for (let i = 0; i < P.multi; i++) {
     const e = targets[i % targets.length];
     const d = Math.hypot(e.x - tx, e.y - ty), t = d / P.pspd;
     let a = Math.atan2(e.y + e.vy * t - ty, e.x + e.vx * t - tx);
     if (i >= targets.length) a += (i - targets.length + 1) * .16 * (i % 2 ? 1 : -1);
     if (i === 0) G.aim = Math.atan2(e.y - DRUID.y, e.x - DRUID.x);
-    const crit = Math.random() < P.crit;
-    G.shots.push({ x: tx, y: ty, vx: Math.cos(a) * P.pspd, vy: Math.sin(a) * P.pspd, dmg: P.dmg * (crit ? 2 : 1), crit, pierce: P.pierce, hit: new Set(), life: (P.range + 160) / P.pspd, rot: Math.random() * TAU });
+    const crit = Math.random() < P.crit, isBig = big && i === 0;
+    G.shots.push({ x: tx, y: ty, vx: Math.cos(a) * P.pspd, vy: Math.sin(a) * P.pspd, dmg: P.dmg * (crit ? 2 : 1) * (isBig ? 2.5 + .5 * P.acorn : 1), crit, big: isBig,
+      pierce: P.pierce, bounces: P.ricochet, hit: new Set(), life: (P.range + 160) / P.pspd, rot: Math.random() * TAU, col: sk.shot, glow: sk.glow });
   }
   play('shoot', .06);
+}
+function fireSpirit(targets) {
+  const [sx, sy] = spiritPos();
+  for (let i = 0; i < P.spirit; i++) {
+    const e = targets[i % targets.length];
+    const a = Math.atan2(e.y - sy, e.x - sx) + (i >= targets.length ? (i - targets.length + 1) * .15 : 0);
+    const crit = Math.random() < P.crit;
+    G.shots.push({ x: sx, y: sy, vx: Math.cos(a) * P.pspd, vy: Math.sin(a) * P.pspd, dmg: P.dmg * .5 * (crit ? 2 : 1), crit, pierce: P.pierce, bounces: 0,
+      hit: new Set(), life: (P.range + 160) / P.pspd, rot: 0, col: '#d8f6ff', glow: 'ice' });
+  }
+}
+function releaseBees() {
+  for (let i = 0; i < 2 * P.bees; i++) {
+    const a = Math.random() * TAU;
+    G.shots.push({ x: rnd(-40, 40), y: rnd(-80, -40), vx: Math.cos(a) * 200, vy: Math.sin(a) * 200, dmg: P.dmg * .6, crit: false, pierce: 0, bounces: 0,
+      hit: new Set(), life: 4, rot: 0, home: true, bee: true });
+  }
+}
+function redirect(s) {
+  let best = null, bd = 240;
+  for (const o of G.enemies) { if (o.dead || o.under || s.hit.has(o)) continue; const d = Math.hypot(o.x - s.x, o.y - s.y); if (d < bd) { bd = d; best = o; } }
+  if (!best) return false;
+  const sp = Math.hypot(s.vx, s.vy), a = Math.atan2(best.y - s.y, best.x - s.x);
+  s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; s.life = Math.max(s.life, bd / sp + .2);
+  return true;
 }
 function addText(x, y, txt, col, size = 15) {
   if (G.texts.length > 70) G.texts.shift();
@@ -759,7 +1050,11 @@ function burst(x, y, col, n = 10, spd = 120, size = 4) {
 }
 function dmgEnemy(e, a, crit, raw) {
   if (e.dead) return;
-  if (!raw) a = Math.max(1, a - e.armor);
+  if (!raw) {
+    if (P.giant && (e.d.boss || e.d.armor)) a *= 1 + .3 * P.giant;
+    if (P.fury && tree.hp < P.maxHp * .5) a *= 1 + .35 * P.fury;
+    a = Math.max(1, a - e.armor);
+  }
   e.hp -= a; G.dmgDone += a;
   if (!raw) {
     e.flash = .08;
@@ -797,7 +1092,7 @@ function chain(from, dmg) {
   let cur = from;
   for (let k = 0; k < 1 + P.chain; k++) {
     let best = null, bd = 170;
-    for (const o of G.enemies) { if (o.dead || hit.has(o)) continue; const d = Math.hypot(o.x - cur.x, o.y - cur.y); if (d < bd) { bd = d; best = o; } }
+    for (const o of G.enemies) { if (o.dead || o.under || hit.has(o)) continue; const d = Math.hypot(o.x - cur.x, o.y - cur.y); if (d < bd) { bd = d; best = o; } }
     if (!best) break;
     hit.add(best); pts.push([best.x, best.y]); dmgEnemy(best, dmg); cur = best;
   }
@@ -815,6 +1110,12 @@ function onHit(s, e) {
     for (let i = 0; i < 5; i++) G.parts.push({ x: s.x, y: s.y, vx: rnd(-90, 90), vy: rnd(-90, 90), life: .5, max: .5, col: '#ff9fc0', r: 3, g: 0, petal: 1, rot: Math.random() * TAU });
   }
   if (P.chain && Math.random() < .2 * P.chain) chain(e, s.dmg * .6);
+  if (s.big) {
+    G.fx.push({ k: 'ring', x: s.x, y: s.y, r: 58, life: .35, max: .35, col: '#e0a86a' });
+    for (const o of G.enemies) if (o !== e && !o.dead && !o.under && Math.hypot(o.x - s.x, o.y - s.y) < 58 + o.r) dmgEnemy(o, s.dmg * .5);
+    burst(s.x, s.y, '#b5793c', 10, 160, 4); G.shake = Math.min(9, G.shake + 2);
+  }
+  if (P.frost && !e.dead && Math.random() < .12 * P.frost) e.frozen = e.d.boss ? .4 : 1;
   if (P.resin && !e.dead) e.resinT = 1.5;
   if (P.exec && !e.dead && !e.d.boss && e.hp < e.max * .08 * P.exec) { addText(e.x, e.y - e.r - 18, 'Raccolto!', '#ffcf4a', 15); kill(e); }
 }
@@ -833,8 +1134,8 @@ function nova() {
 }
 function evolve() {
   const nx = TREE_LV[G.treeLv];
-  if (!nx || !G.evolveOpen || G.sap < nx.cost || (G.state !== 'play' && G.state !== 'choose')) return;
-  G.sap -= nx.cost; G.treeLv++;
+  if (!nx || !G.evolveOpen || G.sap < evoCost(nx) || (G.state !== 'play' && G.state !== 'choose')) return;
+  G.sap -= evoCost(nx); G.treeLv++;
   P.maxHp += 35; tree.hp = Math.min(P.maxHp, tree.hp + 35); P.dmg *= 1.12; P.range += 15;
   if (G.treeLv === 3) P.armor += 2;
   if (G.treeLv === 4 || G.treeLv === 6) P.multi++;
@@ -844,6 +1145,7 @@ function evolve() {
   for (let i = 0; i < 26; i++) G.parts.push({ x: rnd(-80, 80), y: rnd(-120, 0), vx: rnd(-60, 60), vy: rnd(-120, -30), life: rnd(.6, 1.1), max: 1.1, col: i % 3 ? '#b8f27a' : '#ffcf4a', r: 3.2, g: 60, petal: 1, rot: Math.random() * TAU });
   play('up', 0);
   if (G.state === 'choose') renderChoices();
+  if (G.treeLv === TREE_LV.length) openWorld();
 }
 function castRoots() {
   const cands = G.enemies.filter(e => !e.dead && e.dist < P.range + 60);
@@ -865,8 +1167,21 @@ function updEnemy(e, dt) {
   if (e.psnT > 0) { e.psnT -= dt; dmgEnemy(e, e.psn * dt, false, true); if (e.dead) return; if (Math.random() < dt * 6) G.parts.push({ x: e.x + rnd(-8, 8), y: e.y - 6, vx: 0, vy: -30, life: .6, max: .6, col: 'rgba(150,230,90,.8)', r: 2.5, g: 0 }); }
   const dx = -e.x, dy = -e.y, dist = Math.hypot(dx, dy) || 1;
   e.dist = dist; e.a = Math.atan2(dy, dx);
+  if (e.d.burrow) {
+    const was = e.under; e.under = dist > 140;
+    if (was && !e.under) { burst(e.x, e.y, '#6b4a2b', 12, 130, 4); G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 26, life: .3, max: .3, col: '#8a6a45' }); }
+  }
+  if (e.frozen > 0) { e.frozen -= dt; e.vx = e.vy = 0; e.moving = false; return; }
   let spd = e.spd;
   if (e.slow > 0) { e.slow -= dt; spd *= .45; }
+  if (e.leapT > 0) { e.leapT -= dt; spd *= 3.5; }
+  else if (e.d.leap && e.moving) { e.leapCd -= dt; if (e.leapCd <= 0) { e.leapT = .35; e.leapCd = rnd(2, 3.2); } }
+  if (P.worldRoots) spd *= .7;
+  if (e.type === 'taglialegna' && !e.enraged && e.hp < e.max * .5) {
+    e.enraged = true; G.shake = 10;
+    G.banner = { t: 1.6, max: 1.6, text: 'Furia!', sub: 'Il Gran Taglialegna è infuriato', boss: true };
+  }
+  if (e.enraged) spd *= 1.5;
   if (P.mist && dist < 175) spd *= 1 - Math.min(.5, .12 * P.mist);
   if (e.resinT > 0) { e.resinT -= dt; spd *= 1 - (.12 + .08 * P.resin); }
   const stop = e.d.ranged ? e.d.ranged : treeR() + e.r * .5;
@@ -879,19 +1194,22 @@ function updEnemy(e, dt) {
     e.vx = e.vy = 0; e.moving = false;
     e.atk -= dt;
     if (e.atk <= 0) {
-      e.atk = e.d.rate; e.lunge = .14;
+      e.atk = e.d.rate * (e.enraged ? .6 : 1); e.lunge = .14;
       if (e.d.ranged) {
-        const a = Math.atan2(-e.y, -e.x);
-        G.eshots.push({ x: e.x, y: e.y - 8, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, dmg: e.dmg });
+        const a0 = Math.atan2(-e.y, -e.x), n = e.d.boss ? 3 : 1;
+        for (let k = 0; k < n; k++) {
+          const a = a0 + (k - (n - 1) / 2) * .2;
+          G.eshots.push({ x: e.x, y: e.y - 8, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, dmg: e.dmg });
+        }
       } else {
         hurtTree(e.dmg);
         if (P.thorns) dmgEnemy(e, 10 * P.thorns);
       }
     }
   }
-  if (e.type === 'regina') {
+  if (e.d.summon) {
     e.sumCd -= dt;
-    if (e.sumCd <= 0) { e.sumCd = 5; for (let i = 0; i < 3; i++) spawnEnemy('vespa', e.x + rnd(-40, 40), e.y + rnd(-40, 40)); }
+    if (e.sumCd <= 0) { const [t, n, every] = e.d.summon; e.sumCd = every; for (let i = 0; i < n; i++) spawnEnemy(t, e.x + rnd(-40, 40), e.y + rnd(-40, 40)); }
   }
 }
 function separate() {
@@ -922,24 +1240,63 @@ function update(dt) {
   if (G.fireCd <= 0) { const tg = nearestTargets(P.multi); if (tg.length) { fire(tg); G.fireCd = 1 / P.rate; } }
   if (P.roots) { G.rootCd -= dt; if (G.rootCd <= 0) G.rootCd = castRoots() ? Math.max(2.4, 7 - P.roots * .9) : .5; }
   if (P.nova) { G.novaCd -= dt; if (G.novaCd <= 0) { if (G.enemies.some(e => e.dist < 170 + 15 * P.nova)) { nova(); G.novaCd = Math.max(5, 12 - 1.5 * P.nova); } else G.novaCd = .4; } }
+  if (P.spirit) { G.spiritCd -= dt; if (G.spiritCd <= 0) { const tg = nearestTargets(P.spirit); if (tg.length) { fireSpirit(tg); G.spiritCd = 1 / (P.rate * .8); } } }
+  if (P.bees) { G.beeCd -= dt; if (G.beeCd <= 0) { G.beeCd = 6; if (G.enemies.length) releaseBees(); } }
+  if (P.sun) {
+    G.sunCd -= dt;
+    if (G.sunCd <= 0) {
+      const c = G.enemies.filter(e => !e.dead && !e.under && e.dist < P.range + 80);
+      if (c.length) {
+        const t = c.reduce((a, b) => b.hp > a.hp ? b : a);
+        G.fx.push({ k: 'beam', x: t.x, y: t.y, life: .45, max: .45 });
+        dmgEnemy(t, P.dmg * (3 + 1.5 * P.sun), true);
+        G.sunCd = Math.max(3, 8 - 1.2 * P.sun); play('zap', 0);
+      } else G.sunCd = .5;
+    }
+  }
+  if (P.stars) {
+    G.starCd -= dt;
+    if (G.starCd <= 0) {
+      const c = G.enemies.filter(e => !e.dead && !e.under && e.dist < 650);
+      if (c.length) {
+        const t = c[(Math.random() * c.length) | 0], x = t.x, y = t.y;
+        G.fx.push({ k: 'fall', x, y, life: .5, max: .5 }, { k: 'ring', x, y, r: 70, life: .4, max: .4, col: '#fff2a0' });
+        for (const o of G.enemies) if (!o.dead && !o.under && Math.hypot(o.x - x, o.y - y) < 70 + o.r) dmgEnemy(o, P.dmg * 3);
+        G.starCd = 1;
+      } else G.starCd = .3;
+    }
+  }
+  if (P.worldRoots) for (const e of G.enemies) if (!e.dead && e.dist < 190) dmgEnemy(e, P.dmg * .8 * dt, false, true);
   for (let i = 0; i < G.enemies.length; i++) { updEnemy(G.enemies[i], dt); if (G.state !== 'play') return; }
   separate();
   // lucciole
   if (P.ff) {
     for (let i = 0; i < P.ff; i++) {
       const a = G.t * 1.9 + i * TAU / P.ff, fx = Math.cos(a) * 112, fy = Math.sin(a) * 112 - 20;
-      for (const e of G.enemies) if (!e.dead && e.ffCd <= 0 && Math.hypot(e.x - fx, e.y - fy) < e.r + 10) { e.ffCd = .45; dmgEnemy(e, P.dmg * .55); }
+      for (const e of G.enemies) if (!e.dead && !e.under && e.ffCd <= 0 && Math.hypot(e.x - fx, e.y - fy) < e.r + 10) { e.ffCd = .45; dmgEnemy(e, P.dmg * .55); }
     }
   }
   // semi del druido
   for (const s of G.shots) {
+    if (s.home) {
+      if (!s.tg || s.tg.dead) { let bd = 1e9; s.tg = null; for (const o of G.enemies) { if (o.dead || o.under) continue; const d = Math.hypot(o.x - s.x, o.y - s.y); if (d < bd) { bd = d; s.tg = o; } } }
+      const cur = Math.atan2(s.vy, s.vx);
+      const want = s.tg ? Math.atan2(s.tg.y - s.y, s.tg.x - s.x) : cur + Math.sin(G.t * 5) * .5;
+      const da = ((want - cur + Math.PI * 3) % TAU) - Math.PI, na = cur + clamp(da, -7 * dt, 7 * dt);
+      s.vx = Math.cos(na) * 300; s.vy = Math.sin(na) * 300;
+    }
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; s.rot += dt * 14;
     if (s.life <= 0) continue;
+    const hr = s.big ? 12 : 7;
     for (const e of G.enemies) {
-      if (e.dead || s.hit.has(e)) continue;
-      if (Math.abs(e.x - s.x) < e.r + 7 && Math.abs(e.y - s.y) < e.r + 7 && Math.hypot(e.x - s.x, e.y - s.y) < e.r + 7) {
+      if (e.dead || e.under || s.hit.has(e)) continue;
+      if (Math.abs(e.x - s.x) < e.r + hr && Math.abs(e.y - s.y) < e.r + hr && Math.hypot(e.x - s.x, e.y - s.y) < e.r + hr) {
         s.hit.add(e); onHit(s, e);
-        if (--s.pierce < 0) { s.life = 0; break; }
+        if (--s.pierce < 0) {
+          if (s.bounces > 0 && redirect(s)) { s.bounces--; s.pierce = 0; }
+          else s.life = 0;
+          break;
+        }
       }
     }
   }
@@ -987,6 +1344,7 @@ function render() {
     ctx.beginPath(); ctx.arc(0, 0, P.range, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
     if (P.mist) { ctx.fillStyle = `rgba(220,240,255,${.05 + .02 * P.mist})`; ctx.beginPath(); ctx.arc(0, 0, 175, 0, TAU); ctx.fill(); }
   }
+  if (P.worldRoots) { ctx.strokeStyle = 'rgba(120,80,40,.4)'; ctx.lineWidth = 6; ctx.setLineDash([14, 10]); ctx.beginPath(); ctx.arc(0, 0, 190, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
   // radici (sotto)
   for (const f of G.fx) if (f.k === 'roots') drawRoots(f);
   // ombre nemici
@@ -995,9 +1353,10 @@ function render() {
     ell(e.x, e.y + e.r * (e.d.fly ? 1.4 : .8), e.r * .9, e.r * .35, 0, 'rgba(10,30,12,.3)');
   }
   const tsc = treeSc();
-  if (G.treeLv >= 5) glow(GLOW.sap, 0, -40 * tsc, 330 * tsc, .22 + .06 * Math.sin(G.t * 1.5) + (G.treeLv >= 6 ? .12 : 0));
+  if (G.treeLv >= 5) glow(G.treeLv >= 6 ? GLOW.sap : GLOW.pink, 0, -60 * tsc, 360 * tsc, .2 + .06 * Math.sin(G.t * 1.5) + (G.treeLv >= 6 ? .12 : 0));
   ctx.save(); ctx.scale(tsc, tsc); drawTree(); ctx.restore();
   drawDruid();
+  if (P.spirit && G.state !== 'menu') drawSpirit();
   if (G.shield > 0 && G.state !== 'menu') {
     const a = clamp(G.shield / Math.max(1, P.shieldMax), .25, 1);
     ctx.globalAlpha = .18 * a; circ(0, -20, 120 * tsc, '#9fe3ff');
@@ -1012,8 +1371,10 @@ function render() {
     if (e.d.boss) ctx.scale(1.05, 1.05);
     DRAW[e.type](e, e.flash > 0 ? '#ffffff' : null);
     ctx.restore();
+    if (e.frozen > 0) { ctx.globalAlpha = .45; circ(e.x, e.y, e.r + 5, '#bff1ff'); ctx.globalAlpha = 1; }
+    if (e.enraged) glow(GLOW.red, e.x, e.y, e.r * 3, .3 + .15 * Math.sin(G.t * 8));
     if (e.psnT > 0) glow(GLOW.leaf, e.x, e.y, e.r * 2.4, .25);
-    if (!e.d.boss && e.hp < e.max) {
+    if (!e.d.boss && !e.under && e.hp < e.max) {
       const w = Math.max(24, e.r * 2), y = e.y - e.r - (e.d.fly ? 20 : 12);
       rr(e.x - w / 2 - 1.5, y - 1.5, w + 3, 7, 3); ctx.fillStyle = OUT; ctx.fill();
       rr(e.x - w / 2, y, Math.max(0, w * e.hp / e.max), 4, 2); ctx.fillStyle = e.psnT > 0 ? '#9be35a' : '#ff6a50'; ctx.fill();
@@ -1030,10 +1391,23 @@ function render() {
   for (const s of G.eshots) { glow(GLOW.violet, s.x, s.y, 26, .8); circ(s.x, s.y, 5, '#c58bff', OUT, 1.5); }
   // semi
   for (const s of G.shots) {
-    glow(s.crit ? GLOW.sap : GLOW.leaf, s.x, s.y, s.crit ? 34 : 26, .85);
+    if (s.bee) {
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
+      const fl = Math.abs(Math.sin(G.t * 50));
+      ell(-1, -4, 4, 1.5 + fl * 2, -.4, 'rgba(230,245,255,.85)'); ell(-1, 4, 4, 1.5 + fl * 2, .4, 'rgba(230,245,255,.85)');
+      ell(0, 0, 5, 3.4, 0, '#ffcf3d', OUT, 1.4); ctx.fillStyle = OUT; ctx.fillRect(-2, -3, 1.6, 6);
+      ctx.restore(); continue;
+    }
+    glow(s.crit ? GLOW.sap : (GLOW[s.glow] || GLOW.leaf), s.x, s.y, s.big ? 50 : s.crit ? 34 : 26, .85);
     ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
-    ell(0, 0, 7, 4, 0, s.crit ? '#ffd76a' : '#d8ff7a', OUT, 1.6);
-    ell(2, -1.2, 2.5, 1.1, 0, 'rgba(255,255,255,.7)');
+    if (s.big) {
+      ctx.rotate(s.rot * .3);
+      ell(2, 0, 11, 9, 0, '#b5793c', OUT, 2); ell(-6, 0, 6, 11, 0, '#6b4a2b', OUT, 2);
+      ell(4, -3, 3.5, 2, 0, 'rgba(255,255,255,.5)');
+    } else {
+      ell(0, 0, 7, 4, 0, s.crit ? '#ffd76a' : (s.col || '#d8ff7a'), OUT, 1.6);
+      ell(2, -1.2, 2.5, 1.1, 0, 'rgba(255,255,255,.7)');
+    }
     ctx.restore();
   }
   // particelle
@@ -1059,6 +1433,18 @@ function render() {
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
+    }
+  }
+  for (const f of G.fx) {
+    const k = f.life / f.max;
+    if (f.k === 'beam') {
+      ctx.globalAlpha = k * .5; ctx.fillStyle = '#fff2a0'; ctx.fillRect(f.x - 14 * k, f.y - 900, 28 * k, 900);
+      ctx.globalAlpha = k; ctx.fillStyle = '#ffffff'; ctx.fillRect(f.x - 4 * k, f.y - 900, 8 * k, 900);
+      ctx.globalAlpha = 1; glow(GLOW.sap, f.x, f.y, 90, k);
+    } else if (f.k === 'fall') {
+      const p = Math.min(1, (1 - k) * 4), x = f.x + (1 - p) * 120, y = f.y - (1 - p) * 320;
+      ctx.globalAlpha = .5 * k; ctx.strokeStyle = '#fff2a0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x + 50, y - 130); ctx.lineTo(x, y); ctx.stroke(); ctx.globalAlpha = 1;
+      glow(GLOW.sap, x, y, 50, k); star(x, y, 9, '#fff2a0');
     }
   }
   // ambiente: pollini luminosi
@@ -1105,7 +1491,7 @@ function drawRoots(f) {
 }
 
 /* ---------- Interfaccia ---------- */
-const overlays = ['#menu', '#choose', '#pause', '#over', '#shop'];
+const overlays = ['#menu', '#choose', '#pause', '#over', '#shop', '#world', '#skins'];
 function show(id) { for (const o of overlays) $(o).hidden = o !== id; }
 let shopReturn = '#menu';
 const hudCache = {};
@@ -1128,21 +1514,22 @@ function hud() {
   const dockOn = G.state === 'play' && G.evolveOpen && !!nx;
   if ($('#dock').hidden === dockOn) $('#dock').hidden = !dockOn;
   if (dockOn) {
-    const can = G.sap >= nx.cost, b = $('#bEvolve');
-    setText('#evInfo', nx.name + ' · ' + (can ? nx.cost + ' linfa' : 'mancano ' + (nx.cost - G.sap) + ' linfa'));
+    const cost = evoCost(nx), can = G.sap >= cost, b = $('#bEvolve');
+    setText('#evInfo', nx.name + ' · ' + (can ? cost + ' linfa' : 'mancano ' + (cost - G.sap) + ' linfa'));
     if (b.disabled === can) { b.disabled = !can; b.classList.toggle('ready', can); }
   }
 }
 function renderGrow() {
   const nx = TREE_LV[G.treeLv], row = $('#growRow');
+  row.hidden = !G.evolveOpen;
+  if (!G.evolveOpen) return;
   $('#cSap').textContent = G.sap;
   const b = $('#bEvolve2');
   if (!nx) { $('#cGrow').textContent = 'L\'albero ha raggiunto la forma massima: ' + TREE_LV[G.treeLv - 1].name + '.'; b.hidden = true; return; }
   b.hidden = false;
   $('#cGrow').textContent = 'Prossimo livello: ' + nx.name + ' (' + nx.perk + ').';
-  b.textContent = 'Evolvi · ' + nx.cost;
-  b.disabled = G.sap < nx.cost;
-  row.hidden = false;
+  b.textContent = 'Evolvi · ' + evoCost(nx);
+  b.disabled = G.sap < evoCost(nx);
 }
 function weightedPick(pool) {
   const tot = pool.reduce((s, u) => s + RW[u.r], 0);
@@ -1158,7 +1545,7 @@ function rollChoices() {
   return out;
 }
 function renderChoices() {
-  $('#chooseEyebrow').textContent = 'Ondata ' + G.wave + ' superata';
+  $('#chooseEyebrow').textContent = G.wave ? 'Ondata ' + G.wave + ' superata' : 'Benedizione iniziale';
   const wrap = $('#cards'); wrap.innerHTML = '';
   G.choices.forEach((u, i) => {
     const have = G.ups[u.id] || 0;
@@ -1194,7 +1581,8 @@ function resetRun() {
   tree = { hp: P.maxHp, flash: 0 };
   Object.assign(G, { t: 0, wave: 0, kills: 0, runSeeds: 0, enemies: [], shots: [], eshots: [], parts: [], texts: [], fx: [], queue: [],
     spawnCd: 0, waveActive: false, endT: 0, fireCd: .5, rootCd: 3, aim: -Math.PI / 2, cast: 0, shake: 0, banner: null, ups: {}, rerolls: lv('reroll'), dmgDone: 0,
-    sap: 15 * lv('sap'), treeLv: 1, evolveOpen: false, shield: 0, novaCd: 6 });
+    sap: 15 * lv('sap'), treeLv: 1, evolveOpen: false, shield: 0, novaCd: 6,
+    spiritCd: 1, sunCd: 4, beeCd: 4, starCd: 1, shotCount: 0, worldReturn: 'play', worldPower: null });
   for (const k in hudCache) delete hudCache[k];
 }
 function newRun() {
@@ -1202,7 +1590,7 @@ function newRun() {
   resetRun();
   G.state = 'play'; G.speed = 1; $('#bSpeed').textContent = '×1';
   $('#hud').hidden = false; show(null);
-  startWave();
+  if (lv('start')) openChoose(); else startWave();
 }
 function gameOver(quit) {
   if (G.state === 'over') return;
@@ -1262,6 +1650,54 @@ function toMenu() {
   G.state = 'menu'; $('#hud').hidden = true; $('#dock').hidden = true; resetRun(); refreshMenu(); show('#menu');
 }
 
+function openWorld() {
+  G.worldReturn = G.state === 'choose' ? 'choose' : 'play';
+  G.state = 'world';
+  const wrap = $('#worldCards'); wrap.innerHTML = '';
+  WORLD.forEach((u, i) => {
+    const b = document.createElement('button');
+    b.className = 'card r3'; b.id = 'world' + i;
+    b.innerHTML = `<div class="top"><span class="glyph">${ICON[u.cat]}</span><span class="rar">Leggendario</span></div><h3></h3><p></p><span class="key">${i + 1}</span>`;
+    b.querySelector('h3').textContent = u.name; b.querySelector('p').textContent = u.desc;
+    b.addEventListener('click', () => pickWorld(i));
+    wrap.appendChild(b);
+  });
+  setTimeout(() => { if (G.state !== 'world') return; show('#world'); const c = $('#world0'); if (c) c.focus({ preventScroll: true }); }, 700);
+}
+function pickWorld(i) {
+  if (G.state !== 'world' || $('#world').hidden) return;
+  const u = WORLD[i]; if (!u) return;
+  u.apply(); G.worldPower = u.id;
+  G.state = G.worldReturn;
+  if (G.state === 'choose') { show('#choose'); renderChoices(); } else show(null);
+  G.banner = { t: 2.2, max: 2.2, text: u.name, sub: 'Il potere dell\'Albero del Mondo si risveglia', grow: true };
+  play('up', 0);
+}
+let skinsReturn = '#menu';
+function openSkins(from) { skinsReturn = from; renderSkins(); show('#skins'); }
+function renderSkins() {
+  $('#skinPurse').textContent = meta.seeds;
+  const list = $('#skinList'); list.innerHTML = '';
+  for (const sk of SKINS) {
+    const owned = meta.skins.includes(sk.id), on = meta.skin === sk.id;
+    const d = document.createElement('div'); d.className = 'skin' + (on ? ' on' : '');
+    d.innerHTML = '<canvas aria-hidden="true"></canvas><h3></h3><button class="btn"></button>';
+    d.querySelector('h3').textContent = sk.name;
+    const b = d.querySelector('button'); b.id = 'skin-' + sk.id;
+    if (on) { b.textContent = 'In uso'; b.disabled = true; }
+    else if (owned) { b.textContent = 'Indossa'; b.className = 'btn leaf'; }
+    else { b.textContent = 'Compra · ' + sk.cost; b.className = 'btn primary'; b.disabled = sk.cost > meta.seeds; }
+    b.addEventListener('click', () => {
+      if (!meta.skins.includes(sk.id)) { if (sk.cost > meta.seeds) return; meta.seeds -= sk.cost; meta.skins.push(sk.id); }
+      meta.skin = sk.id; save(); ensureAudio(); play('buy', 0); renderSkins(); refreshMenu();
+    });
+    list.appendChild(d);
+    drawSkinPreview(d.querySelector('canvas'), sk);
+  }
+}
+$('#bSkinsMenu').addEventListener('click', () => openSkins('#menu'));
+$('#bSkinsOver').addEventListener('click', () => openSkins('#over'));
+$('#bSkinsBack').addEventListener('click', () => { if (skinsReturn === '#over') show('#over'); else toMenu(); });
 $('#bPlay').addEventListener('click', newRun);
 $('#bRetry').addEventListener('click', newRun);
 $('#bShopMenu').addEventListener('click', () => openShop('#menu'));
@@ -1284,6 +1720,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if ((e.key === 'e' || e.key === 'E') && (G.state === 'play' || G.state === 'choose')) evolve();
   else if (G.state === 'choose' && ['1', '2', '3'].includes(e.key)) pickUpgrade(+e.key - 1);
+  else if (G.state === 'world' && ['1', '2', '3'].includes(e.key)) pickWorld(+e.key - 1);
   else if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && G.state === 'play') openPause();
   else if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && G.state === 'pause') resume();
 });
