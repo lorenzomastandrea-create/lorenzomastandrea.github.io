@@ -134,6 +134,9 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
 .grow-info b{color:#b8f27a}
 .grow-row p{color:var(--ink);font-size:14px}
 .card.r3{--r:var(--sap)}
+.card.fuse{background:linear-gradient(155deg,#4a3470 0%,#2c5135 70%);border-color:#1a0f24;animation:fuseGlow 2.4s ease-in-out infinite}
+.card.fuse .glyph{background:linear-gradient(135deg,#f7bc3f,#c993ff);color:#1a0f24}
+@keyframes fuseGlow{0%,100%{box-shadow:0 6px 0 var(--edge),0 0 0 rgba(201,147,255,0)}50%{box-shadow:0 6px 0 var(--edge),0 0 22px rgba(201,147,255,.55)}}
 .skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(160px,100%),1fr));gap:12px}
 .skin{background:var(--moss-2);border:2px solid var(--edge);border-radius:18px;padding:10px;display:grid;gap:8px;justify-items:center;text-align:center;min-width:0}
 .skin.on{border-color:var(--sap);box-shadow:inset 0 0 0 2px var(--sap)}
@@ -148,6 +151,7 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
 }
 @media (prefers-reduced-motion:reduce){
   .card,.btn,.bar i,.evolve{transition:none}
+  .card.fuse{animation:none}
   .evolve.ready{animation:none}
 }
 </style>
@@ -189,6 +193,7 @@ button:focus-visible{outline:3px solid var(--sap);outline-offset:3px}
         <button class="btn" id="bSkinsMenu">Guardaroba</button>
       </div>
       <p class="menu-meta">Record: ondata <b id="bestTxt">0</b> · Semi d'oro: <b id="mSeedTxt">0</b></p>
+      <p class="menu-meta">Versione 2.0 · nuovi boss, elementi del colpo e fusioni dei doni</p>
     </div>
   </div>
 
@@ -298,7 +303,7 @@ const TREE_R = 62;
 const DISPLAY = "'Grandstander','Trebuchet MS',sans-serif";
 
 /* ---------- Salvataggio (solo in questo browser) ---------- */
-const KEY = 'custode-albero-v1';
+const KEY = 'custode-albero-v1'; // stessa chiave: i progressi della versione precedente restano
 let meta = { seeds: 0, best: 0, lv: {}, skins: ['bosco'], skin: 'bosco' };
 function loadMeta(data) {
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object') meta = Object.assign(meta, s); } catch (e) {}
@@ -359,8 +364,15 @@ const ED = {
   madreragno:{ name: 'Madre Ragno',        hp: 760, spd: 28,  dmg: 22, r: 40, rate: 1.3, seeds: 50, boss: 1, col: '#7a3b4a', leap: 1, summon: ['ragno', 3, 6] },
   taglialegna:{ name: 'Il Gran Taglialegna', hp: 1150, spd: 24, dmg: 40, r: 36, rate: 2.4, seeds: 60, boss: 1, col: '#a3302a', armor: 4 },
   treant:    { name: 'Treant Corrotto',    hp: 820, spd: 20,  dmg: 30, r: 44, rate: 2.2, seeds: 45, boss: 1, col: '#d77bff', armor: 3 },
+  // nuovi boss (aggiornamento 2.0)
+  scarabeore:{ name: 'Scarabeo Imperatore', hp: 620, spd: 22, dmg: 24, r: 40, rate: 1.8, seeds: 45, boss: 1, col: '#3f7fd0', armor: 2, shell: .45 },
+  corvore:   { name: 'Corvo Sovrano',      hp: 640, spd: 34,  dmg: 20, r: 34, rate: 1.2, seeds: 45, boss: 1, col: '#3a3d5c', fly: 1, blink: 4.5, summon: ['corvo', 2, 6] },
+  lumacone:  { name: 'Il Grande Lumacone', hp: 820, spd: 15,  dmg: 26, r: 42, rate: 1.8, seeds: 40, boss: 1, col: '#b5d94a', armor: 2, split: ['lumachina', 2] },
+  lumachina: { name: 'Lumacone figlio',    hp: 300, spd: 24,  dmg: 14, r: 28, rate: 1.4, seeds: 15, boss: 1, col: '#cde86a', armor: 1 },
+  salamandra:{ name: 'Salamandra di Brace', hp: 860, spd: 22, dmg: 22, r: 38, rate: 1.6, seeds: 55, boss: 1, col: '#ff7a2e', ranged: 250, meteor: 5, shotCol: 'ember' },
+  sciamano:  { name: 'Sciamano Corrotto',  hp: 780, spd: 20,  dmg: 16, r: 34, rate: 1.7, seeds: 55, boss: 1, col: '#5ad67a', ranged: 240, heal: 2.6, summon: ['scarabeo', 2, 8] },
 };
-const BOSSES = ['regina', 'fungore', 'madreragno', 'treant', 'taglialegna'];
+const BOSSES = ['regina', 'scarabeore', 'fungore', 'corvore', 'madreragno', 'lumacone', 'treant', 'salamandra', 'sciamano', 'taglialegna'];
 
 const ICON = {
   atk: '<svg viewBox="0 0 24 24"><path d="M12 2c4.5 5 7 9 7 13a7 7 0 0 1-14 0c0-4 2.5-8 7-13z"/></svg>',
@@ -368,8 +380,23 @@ const ICON = {
   magic: '<svg viewBox="0 0 24 24"><path d="M12 1.5l2.6 7.9 7.9 2.6-7.9 2.6L12 22.5l-2.6-7.9L1.5 12l7.9-2.6z"/></svg>',
   nature: '<svg viewBox="0 0 24 24"><path d="M11 22v-8.2C6 13.6 3 10.5 3 5c5.2 0 8 2.6 8.8 6.6C12.6 8 15.4 5.5 21 5.5c0 5.4-3.2 8.3-8 8.4V22z"/></svg>',
 };
-const RAR = ['Comune', 'Raro', 'Epico'];
-const RW = [60, 30, 13];
+Object.assign(ICON, {
+  fire: '<svg viewBox="0 0 24 24"><path d="M12 1.5c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3-1-3 0-6.5 1-9.5zM12 22.5a7 7 0 0 1-7-7c0-1.2.3-2.4.8-3.4.5 3.6 3.2 6.4 6.2 6.4s5.7-2.8 6.2-6.4c.5 1 .8 2.2.8 3.4a7 7 0 0 1-7 7z"/></svg>',
+  ice: '<svg viewBox="0 0 24 24"><path d="M11 1h2v4.2l2.6-2.6 1.4 1.4L13 8v2.3l2-1.2 1.5-5.4 1.9.5-1 3.7 3.6-2.1 1 1.7-3.6 2.1 3.7 1-.5 1.9-5.4-1.5-2 1.2 2 1.2 5.4-1.5.5 1.9-3.7 1 3.6 2.1-1 1.7-3.6-2.1 1 3.7-1.9.5-1.5-5.4-2-1.2V16l4 4-1.4 1.4-2.6-2.6V23h-2v-4.2l-2.6 2.6L7 20l4-4v-2.3l-2 1.2-1.5 5.4-1.9-.5 1-3.7-3.6 2.1-1-1.7 3.6-2.1-3.7-1 .5-1.9 5.4 1.5 2-1.2-2-1.2-5.4 1.5-.5-1.9 3.7-1L1.5 7.1l1-1.7 3.6 2.1-1-3.7 1.9-.5 1.5 5.4 2 1.2V8L7 4l1.4-1.4L11 5.2z"/></svg>',
+  thorn: '<svg viewBox="0 0 24 24"><path d="M3 21C8 16 12 11 14 3l1.5 5L21 6.5 16.5 10l4.5 3-5.5-.5L17 18l-4-3.5C10 18 6 20 3 21z"/></svg>',
+  storm: '<svg viewBox="0 0 24 24"><path d="M14 1L4 13.5h6.5L8.5 23 20 9.5h-6.8z"/></svg>',
+  fusion: '<svg viewBox="0 0 24 24"><path d="M8 3a6 6 0 0 1 4 1.6A6 6 0 1 1 12 19.4 6 6 0 1 1 8 3zm4 4.1a4 4 0 0 0 0 9.8 4 4 0 0 0 0-9.8z"/></svg>',
+});
+const RAR = ['Comune', 'Raro', 'Epico', 'Fusione'];
+const RW = [60, 30, 13, 1];
+const ELEM = {
+  fire:  { name: 'Brace',    col: '#ff9a3d', glow: 'ember' },
+  ice:   { name: 'Gelo',     col: '#c8f4ff', glow: 'ice' },
+  thorn: { name: 'Rovo',     col: '#a6e05a', glow: 'leaf' },
+  storm: { name: 'Tempesta', col: '#fff59a', glow: 'storm' },
+};
+const elemSwap = el => (P && P.elem && P.elem !== el && !P.aurora) ? ' Sostituisce l\'elemento ' + ELEM[P.elem].name + '.' : '';
+const nxt = id => (G.ups[id] || 0) + 1;
 
 const UPS = [
   { id: 'dmg',    cat: 'atk',   r: 0, max: 99, name: 'Linfa affilata',       desc: () => '+20% danno dei semi.', apply: () => P.dmg *= 1.2 },
@@ -405,12 +432,45 @@ const UPS = [
   { id: 'giant',  cat: 'atk',   r: 0, max: 4,  name: 'Cacciatore di giganti',desc: () => '+30% danno contro boss e nemici corazzati.', apply: () => P.giant++ },
   { id: 'wind',   cat: 'atk',   r: 0, max: 4,  name: 'Vento favorevole',     desc: () => 'Semi più veloci del 20% e +6% gittata.', apply: () => { P.pspd *= 1.2; P.range *= 1.06; } },
   { id: 'fury',   cat: 'def',   r: 0, max: 4,  name: 'Furia della natura',   desc: () => '+35% danno quando l\'albero è sotto metà vita.', apply: () => P.fury++ },
+  // --- Elementi del colpo: trasformano la magia del druido (uno attivo alla volta) ---
+  { id: 'el_fire',  cat: 'magic', icon: 'fire',  r: 1, max: 3, name: 'Seme di brace',    desc: () => ['I semi diventano brace: bruciano i nemici (35% del danno al secondo per 3 s).', 'Bruciatura più forte: 50% del danno al secondo.', 'Bruciatura al 65%, e chi muore bruciando esplode in fiamme.'][nxt('el_fire') - 1] + elemSwap('fire'), apply: () => { P.elem = 'fire'; } },
+  { id: 'el_ice',   cat: 'magic', icon: 'ice',   r: 1, max: 3, name: 'Seme di gelo',     desc: () => ['I semi diventano ghiaccio: rallentano del 30% e a volte congelano.', 'Rallentano del 40%; +20% danno ai nemici infreddoliti.', 'Rallentano del 50%; +30% danno agli infreddoliti, congelano più spesso.'][nxt('el_ice') - 1] + elemSwap('ice'), apply: () => { P.elem = 'ice'; } },
+  { id: 'el_thorn', cat: 'magic', icon: 'thorn', r: 1, max: 3, name: 'Seme di rovo',     desc: () => ['I semi diventano spine: trapassano un nemico in più e lo fanno sanguinare.', 'Trapassano 2 nemici in più, sanguinamento più forte.', 'Trapassano 3 nemici in più, sanguinamento al massimo.'][nxt('el_thorn') - 1] + elemSwap('thorn'), apply: () => { P.elem = 'thorn'; } },
+  { id: 'el_storm', cat: 'magic', icon: 'storm', r: 1, max: 3, name: 'Seme di tempesta', desc: () => ['I semi diventano scariche: 30% di probabilità di fulminare un nemico vicino.', '40% di probabilità, la scarica salta su 2 nemici; semi più veloci.', '50% di probabilità, la scarica salta su 3 nemici; semi velocissimi.'][nxt('el_storm') - 1] + elemSwap('storm'), apply: () => { P.elem = 'storm'; } },
+  // --- Nuovi doni (aggiornamento 2.0) ---
+  { id: 'echo',   cat: 'atk',   r: 1, max: 3,  name: 'Eco del bosco',        desc: () => '15% di probabilità che il druido lanci un seme in più.', apply: () => P.echo++ },
+  { id: 'heavy',  cat: 'atk',   r: 0, max: 4,  name: 'Semi di pietra',       desc: () => '+25% danno dei semi, ma lanci un po\' più lenti (-6%).', apply: () => { P.dmg *= 1.25; P.rate *= .94; } },
+  { id: 'sharp',  cat: 'atk',   r: 2, max: 3,  name: 'Spina del cuore',      desc: () => 'I colpi critici fanno +50% di danno in più.', apply: () => P.critMul += .5 },
+  { id: 'wrath',  cat: 'atk',   r: 1, max: 4,  name: 'Ira del druido',       desc: () => 'Ogni nemico abbattuto accelera i lanci (fino a +15% in più per livello), per 3 s.', apply: () => P.wrath++ },
+  { id: 'spring', cat: 'def',   r: 0, max: 5,  name: 'Sorgente nascosta',    desc: () => 'A fine ondata l\'albero recupera l\'8% della vita massima.', apply: () => P.spring++ },
+  { id: 'leech',  cat: 'def',   r: 1, max: 4,  name: 'Linfa vampira',        desc: () => 'Ogni colpo critico cura l\'albero di 1 vita.', apply: () => P.leech++ },
+  { id: 'wall',   cat: 'def',   r: 2, max: 3,  name: 'Siepe di rovi',        desc: () => 'Una siepe di rovi circonda l\'albero: ferisce e rallenta chi la attraversa.', apply: () => P.wall++ },
+  { id: 'rebirth',cat: 'def',   r: 2, max: 1,  name: 'Seme della rinascita', desc: () => 'Una volta per partita, quando l\'albero cade, rinasce con metà vita.', apply: () => P.rebirth = 1 },
+  { id: 'owl',    cat: 'magic', r: 1, max: 3,  name: 'Gufo della notte',     desc: () => 'Un gufo piomba sui nemici ogni pochi secondi e trapassa chi incontra.', apply: () => P.owl++ },
+  { id: 'quake',  cat: 'magic', r: 2, max: 3,  name: 'Scossa della terra',   desc: () => 'Ogni pochi secondi la terra trema: ferisce e stordisce i nemici a terra in gittata.', apply: () => { P.quake++; G.quakeCd = Math.min(G.quakeCd, 3); } },
+  { id: 'pollen', cat: 'nature',r: 0, max: 4,  name: 'Polline dorato',       desc: () => '+1 linfa per ogni nemico abbattuto.', apply: () => P.pollen++ },
+  { id: 'harvest',cat: 'nature',r: 1, max: 3,  name: 'Raccolto abbondante',  desc: () => 'A fine ondata ricevi semi d\'oro in più.', apply: () => P.harvest++ },
+  // --- Fusioni: compaiono quando entrambi i doni richiesti sono al livello massimo ---
+  { id: 'f_icestorm', fuse: ['frost', 'chain'],     cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Tempesta di ghiaccio', desc: () => 'I fulmini verdi scattano più spesso e congelano ogni nemico che toccano.', apply: () => P.fIce = 1 },
+  { id: 'f_toxic',    fuse: ['poison', 'burst'],    cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Fioritura tossica',    desc: () => 'Le esplosioni di petali sono più grandi e avvelenano tutti i nemici colpiti.', apply: () => P.fTox = 1 },
+  { id: 'f_choir',    fuse: ['ff', 'spirit'],       cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Coro di spiriti',      desc: () => 'Due spiriti in più affiancano il druido e le lucciole pungono il doppio.', apply: () => { P.fChoir = 1; P.spirit += 2; } },
+  { id: 'f_inferno',  fuse: ['el_fire', 'acorn'],   cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Ghianda infernale',    desc: () => 'La ghianda gigante parte ogni 3 lanci e incendia tutta l\'area dell\'impatto.', apply: () => P.fInferno = 1 },
+  { id: 'f_swamp',    fuse: ['roots', 'mist'],      cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Palude antica',        desc: () => 'La nebbia si allarga e consuma i nemici; le radici emergono molto più spesso.', apply: () => P.fSwamp = 1 },
+  { id: 'f_zenith',   fuse: ['sun', 'el_storm'],    cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Zenit',                desc: () => 'Il raggio di sole cade il doppio delle volte e si scarica su altri 3 nemici.', apply: () => P.fZenith = 1 },
+  { id: 'f_avalanche',fuse: ['el_ice', 'nova'],     cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Valanga',              desc: () => 'L\'Ira della foresta parte più spesso e congela tutti i nemici che travolge.', apply: () => P.fAval = 1 },
+  { id: 'f_swarm',    fuse: ['bees', 'el_thorn'],   cat: 'magic', icon: 'fusion', r: 3, max: 1, name: 'Sciame di spine',      desc: () => 'Il doppio delle api, più spesso, e ogni ape trapassa due nemici.', apply: () => P.fSwarm = 1 },
+  { id: 'f_bastion',  fuse: ['armor', 'thorns'],    cat: 'def',   icon: 'fusion', r: 3, max: 1, name: 'Bastione di quercia',  desc: () => 'Ogni colpo subito fa altri 4 danni in meno e i rovi feriscono il triplo.', apply: () => { P.fBastion = 1; P.armor += 4; } },
 ];
+const fuseReady = u => u.fuse.every(id => { const b = UPS.find(x => x.id === id); return b && (G.ups[id] || 0) >= b.max; });
 
 const WORLD = [
   { id: 'heart', cat: 'def',    name: 'Cuore di Yggdrasil', desc: 'Vita massima raddoppiata, cura completa e +5 vita al secondo.', apply: () => { P.maxHp *= 2; tree.hp = P.maxHp; P.regen += 5; } },
   { id: 'stars', cat: 'magic',  name: 'Chioma di stelle',   desc: 'Ogni secondo una stella cade su un nemico e ferisce tutto intorno.', apply: () => { P.stars = 1; } },
   { id: 'roots', cat: 'nature', name: 'Radici del mondo',   desc: 'Tutti i nemici sono più lenti del 30%, e chi si avvicina all\'albero perde vita ogni secondo.', apply: () => { P.worldRoots = 1; } },
+  { id: 'aurora', cat: 'magic', icon: 'fusion', name: 'Aurora degli elementi', desc: 'Tutti e quattro gli elementi del colpo sono attivi insieme: brace, gelo, rovo e tempesta.', apply: () => { P.aurora = 1; } },
+  { id: 'amber',  cat: 'def',    name: 'Ambra millenaria',  desc: 'Uno scudo d\'ambra pari a metà della vita massima, che si ricarica da solo durante le ondate.', apply: () => { P.shieldMax += Math.round(P.maxHp * .5); G.shield = P.shieldMax; P.shieldRegen = 5; } },
+  { id: 'tempest',cat: 'magic', icon: 'storm', name: 'Cielo in tempesta', desc: 'Senza sosta i fulmini cadono sui nemici e saltano da uno all\'altro.', apply: () => { P.tempest = 1; } },
+  { id: 'bloom',  cat: 'nature', name: 'Fioritura eterna',  desc: '+60% semi d\'oro e linfa, e ogni nemico abbattuto cura l\'albero di 2 vita.', apply: () => { P.gold += .6; P.sapMul += .6; P.vamp += 2; } },
 ];
 
 const TREE_LV = [
@@ -453,6 +513,7 @@ const G = {
   ups: {}, rerolls: 0, choices: [], dmgDone: 0,
   sap: 0, treeLv: 1, evolveOpen: false, shield: 0, novaCd: 6,
   spiritCd: 1, sunCd: 4, beeCd: 4, starCd: 1, shotCount: 0, worldReturn: 'play', worldPower: null,
+  meteors: [], owlCd: 3, quakeCd: 6, tempCd: 1, wrath: 0, wrathT: 0, worldChoices: [],
 };
 function freshStats() {
   return {
@@ -461,6 +522,9 @@ function freshStats() {
     thorns: 0, poison: 0, chain: 0, burst: 0, roots: 0, ff: 0, mist: 0, vamp: 0, gold: 1 + .1 * lv('gold'),
     sapMul: 1, resin: 0, shieldMax: 15 * lv('shieldp'), exec: 0, nova: 0,
     spirit: 0, sun: 0, frost: 0, ricochet: 0, acorn: 0, fury: 0, giant: 0, bees: 0, stars: 0, worldRoots: 0,
+    elem: null, critMul: 2, echo: 0, wrath: 0, spring: 0, leech: 0, wall: 0, rebirth: 0, owl: 0, quake: 0, pollen: 0, harvest: 0,
+    fIce: 0, fTox: 0, fChoir: 0, fInferno: 0, fSwamp: 0, fZenith: 0, fAval: 0, fSwarm: 0, fBastion: 0,
+    aurora: 0, shieldRegen: 0, tempest: 0,
   };
 }
 
@@ -548,7 +612,7 @@ function glowSprite(col) {
   gr.addColorStop(0, col); gr.addColorStop(.35, col.replace(/[\d.]+\)$/, '.45)')); gr.addColorStop(1, col.replace(/[\d.]+\)$/, '0)'));
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return c;
 }
-const GLOW = { leaf: glowSprite('rgba(200,255,120,1)'), sap: glowSprite('rgba(255,210,90,1)'), fire: glowSprite('rgba(240,255,150,1)'), violet: glowSprite('rgba(210,130,255,1)'), pink: glowSprite('rgba(255,150,190,1)'), ice: glowSprite('rgba(170,230,255,1)'), red: glowSprite('rgba(255,90,70,1)') };
+const GLOW = { leaf: glowSprite('rgba(200,255,120,1)'), sap: glowSprite('rgba(255,210,90,1)'), fire: glowSprite('rgba(240,255,150,1)'), violet: glowSprite('rgba(210,130,255,1)'), pink: glowSprite('rgba(255,150,190,1)'), ice: glowSprite('rgba(170,230,255,1)'), red: glowSprite('rgba(255,90,70,1)'), ember: glowSprite('rgba(255,140,50,1)'), storm: glowSprite('rgba(255,250,160,1)'), blue: glowSprite('rgba(90,160,255,1)') };
 function glow(sp, x, y, size, a = 1) { ctx.globalAlpha = a; ctx.drawImage(sp, x - size / 2, y - size / 2, size, size); ctx.globalAlpha = 1; }
 
 /* ---------- Primitive di disegno ---------- */
@@ -957,9 +1021,68 @@ const DRAW = {
   fungore: (e, f) => { ctx.scale(2.2, 2.2); drawFungo(e, f, '#d0454c'); crown(0, -15, .9); },
   madreragno: (e, f) => { ctx.scale(2.3, 2.3); drawRagno(e, f, true); },
   taglialegna: (e, f) => { ctx.scale(2, 2); drawBoscaiolo(e, f, true); },
+  scarabeore: (e, f) => {
+    if (e.shell > 0) glow(GLOW.blue, 0, 0, 120, .5 + .15 * Math.sin(G.t * 4));
+    ctx.save(); ctx.scale(2.1, 2.1); drawScarabeo(e, f || (e.shell > 0 ? null : '#6a7f95')); ctx.restore();
+    ctx.rotate(e.a); crown(26, 0, 1.1);
+    if (e.shell > 0) { ctx.globalAlpha = .35 + .4 * e.shell / e.shellMax; ctx.lineWidth = 4; ctx.strokeStyle = '#9fd0ff'; ctx.beginPath(); ctx.arc(0, 0, 50, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
+  },
+  corvore: (e, f) => { glow(GLOW.violet, 0, 0, 110, .35); ctx.save(); ctx.scale(2.3, 2.3); drawCorvo(e, f); ctx.restore(); ctx.rotate(e.a); crown(24, 0, 1); },
+  lumacone: (e, f) => { ctx.scale(2.3, 2.3); drawLumaca(e, f); crown(-4, -19, .7); },
+  lumachina: (e, f) => { ctx.scale(1.55, 1.55); drawLumaca(e, f); },
+  salamandra: drawSalamandra,
+  sciamano: drawSciamano,
 };
+function drawSalamandra(e, f) {
+  glow(GLOW.ember, 0, 0, 130, .35 + .1 * Math.sin(G.t * 6));
+  ctx.rotate(e.a); ctx.translate(e.lunge * 30, 0);
+  const w = Math.sin(e.t * (e.moving ? 9 : 3));
+  const body = f || '#ff7a2e', dark = f || '#b8401a';
+  // coda
+  ctx.beginPath(); ctx.moveTo(-26, -7); ctx.quadraticCurveTo(-50, -4 + w * 10, -64, w * 16); ctx.quadraticCurveTo(-48, 6 + w * 8, -26, 7); ctx.closePath();
+  ctx.fillStyle = body; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+  // zampe
+  for (const [x, s] of [[14, -1], [14, 1], [-16, -1], [-16, 1]]) {
+    const k = (s * (x > 0 ? 1 : -1)) * w * 5;
+    ctx.strokeStyle = OUT; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(x, s * 10); ctx.lineTo(x + 6 + k, s * 24); ctx.stroke();
+    ctx.strokeStyle = dark; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, s * 10); ctx.lineTo(x + 6 + k, s * 24); ctx.stroke();
+  }
+  ell(0, 0, 30, 15, 0, body, OUT, 2.5);
+  circ(-12, -4, 4, '#2a1408'); circ(2, 5, 3.5, '#2a1408'); circ(-20, 6, 3, '#2a1408'); circ(10, -6, 3, '#2a1408');
+  ell(32, 0, 14, 11, 0, body, OUT, 2.5);
+  circ(36, -6, 3.2, '#fff2a0', OUT, 1.2); circ(36, 6, 3.2, '#fff2a0', OUT, 1.2); circ(37, -6, 1.4, OUT); circ(37, 6, 1.4, OUT);
+  for (let i = 0; i < 4; i++) { const x = -16 + i * 10; ctx.beginPath(); ctx.moveTo(x - 4, -13); ctx.lineTo(x, -22 - (i % 2) * 4); ctx.lineTo(x + 4, -13); ctx.closePath(); ctx.fillStyle = '#ffcf3d'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OUT; ctx.stroke(); }
+  if (e.lunge > 0) glow(GLOW.ember, 48, 0, 50, .9);
+}
+function drawSciamano(e, f) {
+  const dir = e.x > 0 ? -1 : 1, bob = Math.sin(e.t * 2.5) * 3;
+  glow(GLOW.leaf, 0, -10, 120, .25 + .15 * Math.sin(G.t * 3));
+  ctx.scale(dir * 1.6, 1.6); ctx.translate(0, bob * .3);
+  // bastone
+  ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(16, 22); ctx.lineTo(20, -30); ctx.stroke();
+  ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(16, 22); ctx.lineTo(20, -30); ctx.stroke();
+  glow(GLOW.leaf, 20, -34, 40, .9); circ(20, -34, 6, '#7ff09a', OUT, 2);
+  // veste
+  ctx.beginPath(); ctx.moveTo(-18, 24); ctx.quadraticCurveTo(-16, -4, -10, -14); ctx.lineTo(10, -14); ctx.quadraticCurveTo(16, -4, 18, 24); ctx.quadraticCurveTo(0, 28, -18, 24); ctx.closePath();
+  ctx.fillStyle = f || '#3d2a52'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+  ctx.strokeStyle = '#5ad67a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-14, 16); ctx.lineTo(14, 16); ctx.stroke();
+  // cappuccio
+  ctx.beginPath(); ctx.moveTo(-13, -8); ctx.quadraticCurveTo(-14, -30, 0, -36); ctx.quadraticCurveTo(14, -30, 13, -8); ctx.closePath();
+  ctx.fillStyle = f || '#2b1d3d'; ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke();
+  ell(0, -17, 8, 9, 0, '#0e0814');
+  glow(GLOW.leaf, -3, -18, 14, .9); glow(GLOW.leaf, 4, -18, 14, .9);
+  circ(-3, -18, 1.8, '#c8ffd0'); circ(4, -18, 1.8, '#c8ffd0');
+  // mano
+  circ(15, 0, 4, '#8fb07a', OUT, 1.6);
+}
 
 /* ---------- Logica ---------- */
+// livello dell'elemento del colpo (con l'Aurora sono tutti attivi)
+function elLv(id) {
+  const l = G.ups['el_' + id] || 0;
+  if (P.aurora) return Math.max(1, l);
+  return P.elem === id ? l : 0;
+}
 function spawnEnemy(type, x, y) {
   const d = ED[type], w = Math.max(1, G.wave);
   const hpM = Math.pow(1.12, w - 1), dmM = 1 + (w - 1) * .07;
@@ -967,7 +1090,9 @@ function spawnEnemy(type, x, y) {
   const e = { type, d, x, y, vx: 0, vy: 0, hp: d.hp * hpM, max: d.hp * hpM, spd: d.spd * rnd(.9, 1.1), dmg: d.dmg * dmM, r: d.r,
     atk: rnd(.1, d.rate), flash: 0, slow: 0, psn: 0, psnT: 0, ffCd: 0, t: Math.random() * 10, lunge: 0, dead: false, moving: true,
     armor: (d.armor || 0) * (1 + w * .05), dist: Math.hypot(x, y), a: Math.atan2(-y, -x), sumCd: d.summon ? d.summon[2] * .6 : 4,
-    under: !!d.burrow, leapCd: rnd(1, 2.5), leapT: 0, frozen: 0, resinT: 0, enraged: false };
+    under: !!d.burrow, leapCd: rnd(1, 2.5), leapT: 0, frozen: 0, resinT: 0, enraged: false,
+    burn: 0, burnT: 0, bleed: 0, bleedT: 0, chill: 0, chillK: 0, blinkCd: d.blink || 0, healCd: d.heal || 0, metCd: 3, shell: 0, shellMax: 0, shellCd: 0, wallCd: 0 };
+  if (d.shell) e.shell = e.shellMax = e.max * d.shell;
   G.enemies.push(e); return e;
 }
 function startWave() {
@@ -999,16 +1124,20 @@ function fire(targets) {
   const [tx, ty] = staffTip(), sk = skin();
   G.cast = .15;
   G.shotCount++;
-  const big = P.acorn && G.shotCount % 5 === 0;
-  for (let i = 0; i < P.multi; i++) {
+  const big = P.acorn && G.shotCount % (P.fInferno ? 3 : 5) === 0;
+  const el = P.aurora ? ['fire', 'ice', 'thorn', 'storm'][G.shotCount % 4] : P.elem, ed = el ? ELEM[el] : null;
+  const spd = P.pspd * (1 + .12 * elLv('storm'));
+  const n = P.multi + (P.echo && Math.random() < .15 * P.echo ? 1 : 0);
+  for (let i = 0; i < n; i++) {
     const e = targets[i % targets.length];
-    const d = Math.hypot(e.x - tx, e.y - ty), t = d / P.pspd;
+    const d = Math.hypot(e.x - tx, e.y - ty), t = d / spd;
     let a = Math.atan2(e.y + e.vy * t - ty, e.x + e.vx * t - tx);
     if (i >= targets.length) a += (i - targets.length + 1) * .16 * (i % 2 ? 1 : -1);
     if (i === 0) G.aim = Math.atan2(e.y - DRUID.y, e.x - DRUID.x);
     const crit = Math.random() < P.crit, isBig = big && i === 0;
-    G.shots.push({ x: tx, y: ty, vx: Math.cos(a) * P.pspd, vy: Math.sin(a) * P.pspd, dmg: P.dmg * (crit ? 2 : 1) * (isBig ? 2.5 + .5 * P.acorn : 1), crit, big: isBig,
-      pierce: P.pierce, bounces: P.ricochet, hit: new Set(), life: (P.range + 160) / P.pspd, rot: Math.random() * TAU, col: sk.shot, glow: sk.glow });
+    G.shots.push({ x: tx, y: ty, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, dmg: P.dmg * (crit ? P.critMul : 1) * (isBig ? 2.5 + .5 * P.acorn : 1), crit, big: isBig,
+      pierce: P.pierce + elLv('thorn'), bounces: P.ricochet, hit: new Set(), life: (P.range + 160) / spd, rot: Math.random() * TAU,
+      col: ed ? ed.col : sk.shot, glow: ed ? ed.glow : sk.glow, el, spine: el === 'thorn' });
   }
   play('shoot', .06);
 }
@@ -1018,16 +1147,39 @@ function fireSpirit(targets) {
     const e = targets[i % targets.length];
     const a = Math.atan2(e.y - sy, e.x - sx) + (i >= targets.length ? (i - targets.length + 1) * .15 : 0);
     const crit = Math.random() < P.crit;
-    G.shots.push({ x: sx, y: sy, vx: Math.cos(a) * P.pspd, vy: Math.sin(a) * P.pspd, dmg: P.dmg * .5 * (crit ? 2 : 1), crit, pierce: P.pierce, bounces: 0,
+    G.shots.push({ x: sx, y: sy, vx: Math.cos(a) * P.pspd, vy: Math.sin(a) * P.pspd, dmg: P.dmg * .5 * (crit ? P.critMul : 1), crit, pierce: P.pierce, bounces: 0,
       hit: new Set(), life: (P.range + 160) / P.pspd, rot: 0, col: '#d8f6ff', glow: 'ice' });
   }
 }
 function releaseBees() {
-  for (let i = 0; i < 2 * P.bees; i++) {
+  for (let i = 0; i < 2 * P.bees * (P.fSwarm ? 2 : 1); i++) {
     const a = Math.random() * TAU;
-    G.shots.push({ x: rnd(-40, 40), y: rnd(-80, -40), vx: Math.cos(a) * 200, vy: Math.sin(a) * 200, dmg: P.dmg * .6, crit: false, pierce: 0, bounces: 0,
+    G.shots.push({ x: rnd(-40, 40), y: rnd(-80, -40), vx: Math.cos(a) * 200, vy: Math.sin(a) * 200, dmg: P.dmg * .6, crit: false, pierce: P.fSwarm ? 2 : 0, bounces: 0,
       hit: new Set(), life: 4, rot: 0, home: true, bee: true });
   }
+}
+function releaseOwl() {
+  const a = Math.random() * TAU;
+  G.shots.push({ x: rnd(-30, 30), y: -150, vx: Math.cos(a) * 260, vy: Math.sin(a) * 260, dmg: P.dmg * (2 + P.owl), crit: false, pierce: 2 + P.owl, bounces: 0,
+    hit: new Set(), life: 5, rot: 0, home: true, owl: true });
+}
+function quake() {
+  const R = P.range;
+  G.fx.push({ k: 'ring', x: 0, y: 0, r: R, life: .6, max: .6, col: '#c79a5a' }, { k: 'ring', x: 0, y: 0, r: R * .6, life: .45, max: .45, col: '#8a6a45' });
+  G.shake = Math.min(12, G.shake + 7);
+  for (const e of G.enemies) {
+    if (e.dead || e.d.fly || e.dist > R + e.r) continue;
+    if (e.under) e.under = false;
+    e.frozen = Math.max(e.frozen, e.d.boss ? .25 : .6);
+    dmgEnemy(e, P.dmg * (1.5 + .6 * P.quake));
+    burst(e.x, e.y + e.r * .5, '#8a6a45', 5, 90, 3);
+  }
+  play('root', 0);
+}
+function bolt(t, dmg, jumps) {
+  G.fx.push({ k: 'beam', x: t.x, y: t.y, life: .25, max: .25, thin: 1 });
+  dmgEnemy(t, dmg);
+  if (!t.dead || jumps) chain(t, dmg * .6, jumps);
 }
 function redirect(s) {
   let best = null, bd = 240;
@@ -1053,7 +1205,19 @@ function dmgEnemy(e, a, crit, raw) {
   if (!raw) {
     if (P.giant && (e.d.boss || e.d.armor)) a *= 1 + .3 * P.giant;
     if (P.fury && tree.hp < P.maxHp * .5) a *= 1 + .35 * P.fury;
+    const li = elLv('ice'); if (li >= 2 && (e.chill > 0 || e.frozen > 0)) a *= 1 + .1 * li;
     a = Math.max(1, a - e.armor);
+  }
+  if (e.shell > 0) {
+    const take = Math.min(e.shell, a); e.shell -= take; a -= take;
+    if (!raw) { e.flash = .08; if (Math.random() < .3) burst(e.x, e.y, '#9fd0ff', 2, 80, 2.5); }
+    if (e.shell <= 0) {
+      e.shellCd = 9; e.frozen = Math.max(e.frozen, 2.2); G.shake = Math.min(12, G.shake + 6);
+      G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 90, life: .5, max: .5, col: '#9fd0ff' });
+      burst(e.x, e.y, '#9fd0ff', 26, 220, 5);
+      addText(e.x, e.y - e.r - 24, 'Corazza spezzata!', '#9fd0ff', 18);
+    }
+    if (a <= 0) return;
   }
   e.hp -= a; G.dmgDone += a;
   if (!raw) {
@@ -1067,8 +1231,19 @@ function kill(e) {
   const s = Math.max(1, Math.round(e.d.seeds * P.gold * (1 + G.wave * .04)));
   G.runSeeds += s;
   const sap = Math.max(1, Math.round(e.d.seeds * (e.d.boss ? .6 : 1) * P.sapMul));
-  G.sap += sap;
-  addText(e.x, e.y - 4, '+' + sap, '#b8f27a', 13);
+  G.sap += sap + P.pollen;
+  addText(e.x, e.y - 4, '+' + (sap + P.pollen), '#b8f27a', 13);
+  if (P.wrath) { G.wrath = Math.min(10, G.wrath + 1); G.wrathT = 3; }
+  if (e.d.split) {
+    const [t, n] = e.d.split;
+    for (let i = 0; i < n; i++) { const c = spawnEnemy(t, e.x + (i - (n - 1) / 2) * 50, e.y + rnd(-15, 15)); c.frozen = .5; }
+    G.banner = { t: 1.6, max: 1.6, text: 'Si divide!', sub: e.d.name + ' si spezza in due', boss: true };
+  }
+  if (e.burnT > 0 && elLv('fire') >= 3) {
+    G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 60, life: .35, max: .35, col: '#ff9a3d' });
+    burst(e.x, e.y, '#ff9a3d', 10, 150, 4);
+    for (const o of G.enemies) if (!o.dead && o !== e && !o.under && Math.hypot(o.x - e.x, o.y - e.y) < 60 + o.r) { o.burn = Math.max(o.burn, P.dmg * .4); o.burnT = 3; dmgEnemy(o, P.dmg * .8); }
+  }
   burst(e.x, e.y, e.d.col, e.d.boss ? 40 : 12, e.d.boss ? 260 : 140, e.d.boss ? 7 : 4);
   if (P.vamp) tree.hp = Math.min(P.maxHp, tree.hp + P.vamp);
   if (e.d.boss) { G.shake = 14; G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 140, life: .6, max: .6, col: '#d77bff' }); }
@@ -1085,16 +1260,24 @@ function hurtTree(d) {
   G.shake = Math.min(9, G.shake + 1.5 + d * .1);
   addText(rnd(-30, 30), -40, '-' + Math.round(d), '#ff6a50', 15);
   play('hurt', .12);
+  if (tree.hp <= 0 && P.rebirth) {
+    P.rebirth = 0; tree.hp = P.maxHp * .5;
+    G.banner = { t: 2.2, max: 2.2, text: 'Rinascita!', sub: 'Il seme della rinascita salva l\'albero', grow: true };
+    G.fx.push({ k: 'ring', x: 0, y: -30, r: 220, life: .8, max: .8, col: '#b8f27a' });
+    for (const e of G.enemies) if (!e.dead) { const ux = e.x / (e.dist || 1), uy = e.y / (e.dist || 1); e.x += ux * 80; e.y += uy * 80; e.frozen = Math.max(e.frozen, 1); }
+    play('up', 0); return;
+  }
   if (tree.hp <= 0) { tree.hp = 0; gameOver(); }
 }
-function chain(from, dmg) {
+function chain(from, dmg, jumps = 1 + P.chain) {
   const hit = new Set([from]), pts = [[from.x, from.y]];
   let cur = from;
-  for (let k = 0; k < 1 + P.chain; k++) {
+  for (let k = 0; k < jumps; k++) {
     let best = null, bd = 170;
     for (const o of G.enemies) { if (o.dead || o.under || hit.has(o)) continue; const d = Math.hypot(o.x - cur.x, o.y - cur.y); if (d < bd) { bd = d; best = o; } }
     if (!best) break;
     hit.add(best); pts.push([best.x, best.y]); dmgEnemy(best, dmg); cur = best;
+    if (P.fIce && !best.dead) best.frozen = Math.max(best.frozen, best.d.boss ? .3 : .8);
   }
   if (pts.length > 1) { G.fx.push({ k: 'bolt', pts, life: .22, max: .22 }); play('zap', .08); }
 }
@@ -1103,16 +1286,30 @@ function onHit(s, e) {
   burst(s.x, s.y, '#c9f27a', 3, 80, 2.5);
   play('hit', .05);
   if (P.poison) { e.psn = Math.max(e.psn, s.dmg * .3 * P.poison); e.psnT = 3; }
+  if (s.crit && P.leech) tree.hp = Math.min(P.maxHp, tree.hp + P.leech);
+  // elementi del colpo
+  const lf = elLv('fire'), li = elLv('ice'), lt = elLv('thorn'), ls = elLv('storm');
+  if (lf && !e.dead) { e.burn = Math.max(e.burn, s.dmg * (.2 + .15 * lf)); e.burnT = 3; }
+  if (li && !e.dead) { e.chill = 2; e.chillK = .2 + .1 * li; if (Math.random() < .05 + .04 * li) e.frozen = Math.max(e.frozen, e.d.boss ? .3 : .9); }
+  if (lt && !e.dead) { e.bleed = Math.max(e.bleed, s.dmg * .1 * lt); e.bleedT = 4; }
+  if (ls && Math.random() < .2 + .1 * ls) chain(e, s.dmg * .45, ls);
   if (P.burst) {
-    const R = 36 + 10 * P.burst;
+    const R = (36 + 10 * P.burst) * (P.fTox ? 1.35 : 1);
     G.fx.push({ k: 'ring', x: s.x, y: s.y, r: R, life: .3, max: .3, col: '#ff9fc0' });
-    for (const o of G.enemies) if (o !== e && !o.dead && Math.hypot(o.x - s.x, o.y - s.y) < R + o.r) dmgEnemy(o, s.dmg * (.25 + .07 * P.burst));
+    for (const o of G.enemies) if (o !== e && !o.dead && Math.hypot(o.x - s.x, o.y - s.y) < R + o.r) {
+      dmgEnemy(o, s.dmg * (.25 + .07 * P.burst));
+      if (P.fTox) { o.psn = Math.max(o.psn, s.dmg * .3 * Math.max(1, P.poison)); o.psnT = 3; }
+    }
     for (let i = 0; i < 5; i++) G.parts.push({ x: s.x, y: s.y, vx: rnd(-90, 90), vy: rnd(-90, 90), life: .5, max: .5, col: '#ff9fc0', r: 3, g: 0, petal: 1, rot: Math.random() * TAU });
   }
-  if (P.chain && Math.random() < .2 * P.chain) chain(e, s.dmg * .6);
+  if (P.chain && Math.random() < .2 * P.chain + (P.fIce ? .15 : 0)) chain(e, s.dmg * .6);
   if (s.big) {
     G.fx.push({ k: 'ring', x: s.x, y: s.y, r: 58, life: .35, max: .35, col: '#e0a86a' });
     for (const o of G.enemies) if (o !== e && !o.dead && !o.under && Math.hypot(o.x - s.x, o.y - s.y) < 58 + o.r) dmgEnemy(o, s.dmg * .5);
+    if (P.fInferno) {
+      G.fx.push({ k: 'ring', x: s.x, y: s.y, r: 85, life: .45, max: .45, col: '#ff7a2e' }); burst(s.x, s.y, '#ff9a3d', 14, 200, 4);
+      for (const o of G.enemies) if (!o.dead && !o.under && Math.hypot(o.x - s.x, o.y - s.y) < 85 + o.r) { o.burn = Math.max(o.burn, s.dmg * .3); o.burnT = 3.5; }
+    }
     burst(s.x, s.y, '#b5793c', 10, 160, 4); G.shake = Math.min(9, G.shake + 2);
   }
   if (P.frost && !e.dead && Math.random() < .12 * P.frost) e.frozen = e.d.boss ? .4 : 1;
@@ -1128,6 +1325,7 @@ function nova() {
     const k = 46 / (e.d.boss ? 4 : 1), ux = e.x / (e.dist || 1), uy = e.y / (e.dist || 1);
     e.x += ux * k; e.y += uy * k;
     dmgEnemy(e, P.dmg * (1.5 + .5 * P.nova));
+    if (P.fAval && !e.dead) { e.frozen = Math.max(e.frozen, e.d.boss ? .5 : 1.5); burst(e.x, e.y, '#c8f4ff', 4, 80, 3); }
   }
   for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; G.parts.push({ x: Math.cos(a) * 60, y: Math.sin(a) * 60 - 10, vx: Math.cos(a) * 220, vy: Math.sin(a) * 220, life: .5, max: .5, col: '#b8f27a', r: 3, g: 0, petal: 1, rot: a }); }
   play('root', 0);
@@ -1165,8 +1363,50 @@ function castRoots() {
 function updEnemy(e, dt) {
   e.t += dt; e.flash = Math.max(0, e.flash - dt); e.lunge = Math.max(0, e.lunge - dt); e.ffCd -= dt;
   if (e.psnT > 0) { e.psnT -= dt; dmgEnemy(e, e.psn * dt, false, true); if (e.dead) return; if (Math.random() < dt * 6) G.parts.push({ x: e.x + rnd(-8, 8), y: e.y - 6, vx: 0, vy: -30, life: .6, max: .6, col: 'rgba(150,230,90,.8)', r: 2.5, g: 0 }); }
+  if (e.burnT > 0) { e.burnT -= dt; dmgEnemy(e, e.burn * dt, false, true); if (e.dead) return; if (Math.random() < dt * 10) G.parts.push({ x: e.x + rnd(-8, 8), y: e.y - 4, vx: rnd(-10, 10), vy: -50, life: .5, max: .5, col: 'rgba(255,150,60,.9)', r: 2.8, g: -20 }); }
+  if (e.bleedT > 0) { e.bleedT -= dt; dmgEnemy(e, e.bleed * dt, false, true); if (e.dead) return; if (Math.random() < dt * 5) G.parts.push({ x: e.x + rnd(-6, 6), y: e.y, vx: 0, vy: 20, life: .5, max: .5, col: 'rgba(200,40,50,.85)', r: 2.2, g: 120 }); }
   const dx = -e.x, dy = -e.y, dist = Math.hypot(dx, dy) || 1;
   e.dist = dist; e.a = Math.atan2(dy, dx);
+  // meccaniche dei nuovi boss
+  if (e.d.shell && e.shell <= 0) {
+    e.shellCd -= dt;
+    if (e.shellCd <= 0) { e.shell = e.shellMax; G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 70, life: .5, max: .5, col: '#5aa0ff' }); addText(e.x, e.y - e.r - 20, 'Corazza ricresciuta', '#9fd0ff', 15); }
+  }
+  if (e.d.blink && e.frozen <= 0) {
+    e.blinkCd -= dt;
+    if (e.blinkCd <= 0) {
+      e.blinkCd = e.d.blink * rnd(.8, 1.2);
+      burst(e.x, e.y, '#2b2e4a', 22, 160, 6);
+      const a = Math.atan2(e.y, e.x) + rnd(-1.3, 1.3), r = clamp(dist + rnd(-20, 80), 170, 380);
+      e.x = Math.cos(a) * r; e.y = Math.sin(a) * r;
+      burst(e.x, e.y, '#6a6fa0', 22, 160, 6);
+      G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 60, life: .35, max: .35, col: '#8a8fd0' });
+      return;
+    }
+  }
+  if (e.d.heal) {
+    e.healCd -= dt;
+    if (e.healCd <= 0) {
+      e.healCd = e.d.heal;
+      G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 220, life: .6, max: .6, col: '#5ad67a' });
+      for (const o of G.enemies) {
+        if (o.dead || Math.hypot(o.x - e.x, o.y - e.y) > 220) continue;
+        const h = o.max * (o === e ? .025 : .1);
+        o.hp = Math.min(o.max, o.hp + h); o.psnT = 0; o.burnT = 0; o.bleedT = 0;
+        if (o !== e) { addText(o.x, o.y - o.r - 8, '+' + Math.round(h), '#5ad67a', 13); burst(o.x, o.y, '#7ff09a', 4, 60, 2.5); }
+      }
+    }
+  }
+  if (e.d.meteor && dist < 460) {
+    e.metCd -= dt;
+    if (e.metCd <= 0) {
+      e.metCd = 3.4;
+      for (let i = 0; i < e.d.meteor; i++) {
+        const a = Math.random() * TAU, r = rnd(0, treeR() + 70);
+        G.meteors.push({ x: Math.cos(a) * r, y: Math.sin(a) * r - 10, t: 1.1 + i * .18, max: 1.1 + i * .18, dmg: e.dmg * .7 });
+      }
+    }
+  }
   if (e.d.burrow) {
     const was = e.under; e.under = dist > 140;
     if (was && !e.under) { burst(e.x, e.y, '#6b4a2b', 12, 130, 4); G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 26, life: .3, max: .3, col: '#8a6a45' }); }
@@ -1184,6 +1424,12 @@ function updEnemy(e, dt) {
   if (e.enraged) spd *= 1.5;
   if (P.mist && dist < 175) spd *= 1 - Math.min(.5, .12 * P.mist);
   if (e.resinT > 0) { e.resinT -= dt; spd *= 1 - (.12 + .08 * P.resin); }
+  if (e.chill > 0) { e.chill -= dt; spd *= 1 - e.chillK; }
+  if (P.fSwamp && dist < 230) spd *= .8;
+  if (P.wall && !e.d.fly && dist < 168 && dist > treeR() * .6) {
+    spd *= .8; e.wallCd -= dt;
+    if (e.wallCd <= 0) { e.wallCd = .5; dmgEnemy(e, P.dmg * .25 * P.wall); if (e.dead) return; }
+  }
   const stop = e.d.ranged ? e.d.ranged : treeR() + e.r * .5;
   if (dist > stop) {
     const mx = dx / dist, my = dy / dist;
@@ -1199,11 +1445,11 @@ function updEnemy(e, dt) {
         const a0 = Math.atan2(-e.y, -e.x), n = e.d.boss ? 3 : 1;
         for (let k = 0; k < n; k++) {
           const a = a0 + (k - (n - 1) / 2) * .2;
-          G.eshots.push({ x: e.x, y: e.y - 8, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, dmg: e.dmg });
+          G.eshots.push({ x: e.x, y: e.y - 8, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, dmg: e.dmg, glow: e.d.shotCol });
         }
       } else {
         hurtTree(e.dmg);
-        if (P.thorns) dmgEnemy(e, 10 * P.thorns);
+        if (P.thorns) dmgEnemy(e, 10 * P.thorns * (P.fBastion ? 3 : 1));
       }
     }
   }
@@ -1236,12 +1482,34 @@ function update(dt) {
     if (G.spawnCd <= 0) { spawnEnemy(G.queue.shift()); G.spawnCd = G.spawnGap * rnd(.5, 1.5); }
   }
   tree.hp = Math.min(P.maxHp, tree.hp + P.regen * dt);
+  if (G.wrathT > 0) { G.wrathT -= dt; if (G.wrathT <= 0) G.wrath = 0; }
+  if (P.shieldRegen && G.waveActive) G.shield = Math.min(P.shieldMax, G.shield + P.shieldRegen * dt);
   G.fireCd -= dt;
-  if (G.fireCd <= 0) { const tg = nearestTargets(P.multi); if (tg.length) { fire(tg); G.fireCd = 1 / P.rate; } }
-  if (P.roots) { G.rootCd -= dt; if (G.rootCd <= 0) G.rootCd = castRoots() ? Math.max(2.4, 7 - P.roots * .9) : .5; }
-  if (P.nova) { G.novaCd -= dt; if (G.novaCd <= 0) { if (G.enemies.some(e => e.dist < 170 + 15 * P.nova)) { nova(); G.novaCd = Math.max(5, 12 - 1.5 * P.nova); } else G.novaCd = .4; } }
+  if (G.fireCd <= 0) { const tg = nearestTargets(P.multi); if (tg.length) { fire(tg); G.fireCd = 1 / (P.rate * (1 + .015 * P.wrath * G.wrath)); } }
+  if (P.roots) { G.rootCd -= dt; if (G.rootCd <= 0) G.rootCd = castRoots() ? Math.max(2.4, 7 - P.roots * .9) * (P.fSwamp ? .5 : 1) : .5; }
+  if (P.nova) { G.novaCd -= dt; if (G.novaCd <= 0) { if (G.enemies.some(e => e.dist < 170 + 15 * P.nova)) { nova(); G.novaCd = Math.max(5, 12 - 1.5 * P.nova) * (P.fAval ? .7 : 1); } else G.novaCd = .4; } }
+  if (P.owl) { G.owlCd -= dt; if (G.owlCd <= 0) { if (G.enemies.length) { releaseOwl(); G.owlCd = Math.max(2.5, 6 - P.owl); } else G.owlCd = .5; } }
+  if (P.quake) { G.quakeCd -= dt; if (G.quakeCd <= 0) { if (G.enemies.some(e => !e.d.fly && e.dist < P.range)) { quake(); G.quakeCd = Math.max(5, 10 - 1.5 * P.quake); } else G.quakeCd = .5; } }
+  if (P.tempest) {
+    G.tempCd -= dt;
+    if (G.tempCd <= 0) {
+      const c = G.enemies.filter(e => !e.dead && !e.under && e.dist < 650);
+      if (c.length) { bolt(c[(Math.random() * c.length) | 0], P.dmg * 2, 3); G.tempCd = .8; play('zap', .1); } else G.tempCd = .3;
+    }
+  }
+  if (P.fSwamp) for (const e of G.enemies) if (!e.dead && e.dist < 230) dmgEnemy(e, P.dmg * .5 * dt, false, true);
+  // pioggia di fuoco della Salamandra
+  for (const m of G.meteors) {
+    m.t -= dt;
+    if (m.t <= 0) {
+      m.done = true; burst(m.x, m.y, '#ff9a3d', 14, 180, 4.5);
+      G.fx.push({ k: 'ring', x: m.x, y: m.y, r: 40, life: .35, max: .35, col: '#ff7a2e' });
+      if (Math.hypot(m.x, m.y) < treeR() + 14) { hurtTree(m.dmg); if (G.state !== 'play') return; }
+    }
+  }
+  G.meteors = G.meteors.filter(m => !m.done);
   if (P.spirit) { G.spiritCd -= dt; if (G.spiritCd <= 0) { const tg = nearestTargets(P.spirit); if (tg.length) { fireSpirit(tg); G.spiritCd = 1 / (P.rate * .8); } } }
-  if (P.bees) { G.beeCd -= dt; if (G.beeCd <= 0) { G.beeCd = 6; if (G.enemies.length) releaseBees(); } }
+  if (P.bees) { G.beeCd -= dt; if (G.beeCd <= 0) { G.beeCd = P.fSwarm ? 4 : 6; if (G.enemies.length) releaseBees(); } }
   if (P.sun) {
     G.sunCd -= dt;
     if (G.sunCd <= 0) {
@@ -1250,7 +1518,8 @@ function update(dt) {
         const t = c.reduce((a, b) => b.hp > a.hp ? b : a);
         G.fx.push({ k: 'beam', x: t.x, y: t.y, life: .45, max: .45 });
         dmgEnemy(t, P.dmg * (3 + 1.5 * P.sun), true);
-        G.sunCd = Math.max(3, 8 - 1.2 * P.sun); play('zap', 0);
+        if (P.fZenith) chain(t, P.dmg * (1.5 + .5 * P.sun), 3);
+        G.sunCd = Math.max(3, 8 - 1.2 * P.sun) * (P.fZenith ? .5 : 1); play('zap', 0);
       } else G.sunCd = .5;
     }
   }
@@ -1273,7 +1542,7 @@ function update(dt) {
   if (P.ff) {
     for (let i = 0; i < P.ff; i++) {
       const a = G.t * 1.9 + i * TAU / P.ff, fx = Math.cos(a) * 112, fy = Math.sin(a) * 112 - 20;
-      for (const e of G.enemies) if (!e.dead && !e.under && e.ffCd <= 0 && Math.hypot(e.x - fx, e.y - fy) < e.r + 10) { e.ffCd = .45; dmgEnemy(e, P.dmg * .55); }
+      for (const e of G.enemies) if (!e.dead && !e.under && e.ffCd <= 0 && Math.hypot(e.x - fx, e.y - fy) < e.r + 10) { e.ffCd = .45; dmgEnemy(e, P.dmg * .55 * (P.fChoir ? 2 : 1)); }
     }
   }
   // semi del druido
@@ -1283,8 +1552,10 @@ function update(dt) {
       const cur = Math.atan2(s.vy, s.vx);
       const want = s.tg ? Math.atan2(s.tg.y - s.y, s.tg.x - s.x) : cur + Math.sin(G.t * 5) * .5;
       const da = ((want - cur + Math.PI * 3) % TAU) - Math.PI, na = cur + clamp(da, -7 * dt, 7 * dt);
-      s.vx = Math.cos(na) * 300; s.vy = Math.sin(na) * 300;
+      const hs = s.owl ? 340 : 300;
+      s.vx = Math.cos(na) * hs; s.vy = Math.sin(na) * hs;
     }
+    if (s.el && Math.random() < dt * 22) G.parts.push({ x: s.x, y: s.y, vx: rnd(-15, 15), vy: rnd(-15, 15), life: .3, max: .3, col: ELEM[s.el].col, r: 2.2, g: 0 });
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; s.rot += dt * 14;
     if (s.life <= 0) continue;
     const hr = s.big ? 12 : 7;
@@ -1313,6 +1584,8 @@ function update(dt) {
     const bonus = Math.round((4 + G.wave * 2) * P.gold);
     G.runSeeds += bonus;
     G.sap += Math.round((3 + G.wave) * P.sapMul);
+    if (P.harvest) G.runSeeds += Math.round((3 + G.wave) * P.harvest * P.gold);
+    if (P.spring) tree.hp = Math.min(P.maxHp, tree.hp + P.maxHp * .08 * P.spring);
     G.evolveOpen = true;
     addText(0, -150, 'Ondata superata!', '#f7bc3f', 22);
     G.texts[G.texts.length - 1].life = G.texts[G.texts.length - 1].max = 1.6;
@@ -1344,6 +1617,11 @@ function render() {
     ctx.beginPath(); ctx.arc(0, 0, P.range, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
     if (P.mist) { ctx.fillStyle = `rgba(220,240,255,${.05 + .02 * P.mist})`; ctx.beginPath(); ctx.arc(0, 0, 175, 0, TAU); ctx.fill(); }
   }
+  if (P.fSwamp && G.state !== 'menu') { ctx.fillStyle = 'rgba(90,140,70,.12)'; ctx.beginPath(); ctx.arc(0, 0, 230, 0, TAU); ctx.fill(); }
+  if (P.wall && G.state !== 'menu') {
+    ctx.strokeStyle = 'rgba(70,110,40,.75)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 165, 0, TAU); ctx.stroke();
+    for (let i = 0; i < 36; i++) { const a = i / 36 * TAU, x = Math.cos(a) * 165, y = Math.sin(a) * 165; ctx.save(); ctx.translate(x, y); ctx.rotate(a + (i % 2 ? .6 : -.6)); ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(9, 0); ctx.lineTo(0, 3); ctx.closePath(); ctx.fillStyle = '#9ad44a'; ctx.fill(); ctx.restore(); }
+  }
   if (P.worldRoots) { ctx.strokeStyle = 'rgba(120,80,40,.4)'; ctx.lineWidth = 6; ctx.setLineDash([14, 10]); ctx.beginPath(); ctx.arc(0, 0, 190, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
   // radici (sotto)
   for (const f of G.fx) if (f.k === 'roots') drawRoots(f);
@@ -1356,6 +1634,7 @@ function render() {
   if (G.treeLv >= 5) glow(G.treeLv >= 6 ? GLOW.sap : GLOW.pink, 0, -60 * tsc, 360 * tsc, .2 + .06 * Math.sin(G.t * 1.5) + (G.treeLv >= 6 ? .12 : 0));
   ctx.save(); ctx.scale(tsc, tsc); drawTree(); ctx.restore();
   drawDruid();
+  if ((P.elem || P.aurora) && G.state !== 'menu') { const [sx2, sy2] = staffTip(), ed = ELEM[P.aurora ? ['fire', 'ice', 'thorn', 'storm'][Math.floor(G.t * 2) % 4] : P.elem]; glow(GLOW[ed.glow], sx2, sy2, 34 + 6 * Math.sin(G.t * 5), .9); }
   if (P.spirit && G.state !== 'menu') drawSpirit();
   if (G.shield > 0 && G.state !== 'menu') {
     const a = clamp(G.shield / Math.max(1, P.shieldMax), .25, 1);
@@ -1374,6 +1653,8 @@ function render() {
     if (e.frozen > 0) { ctx.globalAlpha = .45; circ(e.x, e.y, e.r + 5, '#bff1ff'); ctx.globalAlpha = 1; }
     if (e.enraged) glow(GLOW.red, e.x, e.y, e.r * 3, .3 + .15 * Math.sin(G.t * 8));
     if (e.psnT > 0) glow(GLOW.leaf, e.x, e.y, e.r * 2.4, .25);
+    if (e.burnT > 0) glow(GLOW.ember, e.x, e.y, e.r * 2.6, .35 + .1 * Math.sin(G.t * 12 + e.t));
+    if (e.chill > 0 && e.frozen <= 0) { ctx.globalAlpha = .22; circ(e.x, e.y, e.r + 3, '#bff1ff'); ctx.globalAlpha = 1; }
     if (!e.d.boss && !e.under && e.hp < e.max) {
       const w = Math.max(24, e.r * 2), y = e.y - e.r - (e.d.fly ? 20 : 12);
       rr(e.x - w / 2 - 1.5, y - 1.5, w + 3, 7, 3); ctx.fillStyle = OUT; ctx.fill();
@@ -1388,7 +1669,16 @@ function render() {
     }
   }
   // spore nemiche
-  for (const s of G.eshots) { glow(GLOW.violet, s.x, s.y, 26, .8); circ(s.x, s.y, 5, '#c58bff', OUT, 1.5); }
+  for (const s of G.eshots) {
+    if (s.glow === 'ember') { glow(GLOW.ember, s.x, s.y, 30, .9); circ(s.x, s.y, 5.5, '#ffb050', OUT, 1.5); }
+    else { glow(GLOW.violet, s.x, s.y, 26, .8); circ(s.x, s.y, 5, '#c58bff', OUT, 1.5); }
+  }
+  // pioggia di fuoco: avviso a terra e palla che cade
+  for (const m of G.meteors) {
+    const k = clamp(1 - m.t / m.max, 0, 1);
+    ctx.globalAlpha = .25 + .35 * k; ell(m.x, m.y, 26, 13, 0, 'rgba(255,90,40,.35)'); ctx.lineWidth = 2; ctx.strokeStyle = '#ff7a2e'; ctx.beginPath(); ctx.ellipse(m.x, m.y, 26 * k + 4, 13 * k + 2, 0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+    if (m.t < .55) { const fy = m.y - m.t / .55 * 380, fx = m.x + m.t / .55 * 90; glow(GLOW.ember, fx, fy, 50, .95); circ(fx, fy, 8, '#ffcf3d', OUT, 2); }
+  }
   // semi
   for (const s of G.shots) {
     if (s.bee) {
@@ -1398,12 +1688,23 @@ function render() {
       ell(0, 0, 5, 3.4, 0, '#ffcf3d', OUT, 1.4); ctx.fillStyle = OUT; ctx.fillRect(-2, -3, 1.6, 6);
       ctx.restore(); continue;
     }
+    if (s.owl) {
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
+      const fl = Math.sin(G.t * 18) * 5;
+      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(2, 0); ctx.quadraticCurveTo(-4, sd * (16 + fl), -12, sd * (14 + fl)); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fillStyle = '#8a6a45'; ctx.fill(); ctx.lineWidth = 1.8; ctx.strokeStyle = OUT; ctx.stroke(); }
+      ell(-2, 0, 10, 8, 0, '#a8835a', OUT, 2); circ(6, 0, 7, '#c49a6c', OUT, 2);
+      circ(8, -3, 2.6, '#fff2a0', OUT, 1); circ(8, 3, 2.6, '#fff2a0', OUT, 1); circ(9, -3, 1, OUT); circ(9, 3, 1, OUT);
+      ctx.restore(); continue;
+    }
     glow(s.crit ? GLOW.sap : (GLOW[s.glow] || GLOW.leaf), s.x, s.y, s.big ? 50 : s.crit ? 34 : 26, .85);
     ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
     if (s.big) {
       ctx.rotate(s.rot * .3);
       ell(2, 0, 11, 9, 0, '#b5793c', OUT, 2); ell(-6, 0, 6, 11, 0, '#6b4a2b', OUT, 2);
       ell(4, -3, 3.5, 2, 0, 'rgba(255,255,255,.5)');
+    } else if (s.spine) {
+      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-7, -3.5); ctx.lineTo(-4, 0); ctx.lineTo(-7, 3.5); ctx.closePath();
+      ctx.fillStyle = s.crit ? '#ffd76a' : s.col; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = OUT; ctx.stroke();
     } else {
       ell(0, 0, 7, 4, 0, s.crit ? '#ffd76a' : (s.col || '#d8ff7a'), OUT, 1.6);
       ell(2, -1.2, 2.5, 1.1, 0, 'rgba(255,255,255,.7)');
@@ -1437,7 +1738,11 @@ function render() {
   }
   for (const f of G.fx) {
     const k = f.life / f.max;
-    if (f.k === 'beam') {
+    if (f.k === 'beam' && f.thin) {
+      ctx.globalAlpha = k; ctx.strokeStyle = '#fff59a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(f.x + rnd(-20, 20), f.y - 600);
+      for (let i = 1; i <= 6; i++) ctx.lineTo(f.x + (i < 6 ? rnd(-14, 14) : 0), f.y - 600 + i * 100);
+      ctx.stroke(); ctx.globalAlpha = 1; glow(GLOW.storm, f.x, f.y, 60, k);
+    } else if (f.k === 'beam') {
       ctx.globalAlpha = k * .5; ctx.fillStyle = '#fff2a0'; ctx.fillRect(f.x - 14 * k, f.y - 900, 28 * k, 900);
       ctx.globalAlpha = k; ctx.fillStyle = '#ffffff'; ctx.fillRect(f.x - 4 * k, f.y - 900, 8 * k, 900);
       ctx.globalAlpha = 1; glow(GLOW.sap, f.x, f.y, 90, k);
@@ -1477,6 +1782,7 @@ function render() {
     ctx.strokeText(boss.d.name, W / 2, y - 14); ctx.fillStyle = '#e7a6ff'; ctx.fillText(boss.d.name, W / 2, y - 14);
     rr(x - 3, y - 3, w + 6, 18, 9); ctx.fillStyle = OUT; ctx.fill();
     rr(x, y, Math.max(0, w * boss.hp / boss.max), 12, 6); ctx.fillStyle = '#b765e8'; ctx.fill();
+    if (boss.shell > 0) { rr(x, y + 7, Math.max(0, w * boss.shell / boss.shellMax), 5, 2.5); ctx.fillStyle = '#9fd0ff'; ctx.fill(); }
   }
 }
 function drawRoots(f) {
@@ -1538,9 +1844,12 @@ function weightedPick(pool) {
   return pool[pool.length - 1];
 }
 function rollChoices() {
-  let pool = UPS.filter(u => (G.ups[u.id] || 0) < u.max);
+  let pool = UPS.filter(u => !u.fuse && (G.ups[u.id] || 0) < u.max);
   if (tree.hp > P.maxHp * .85) pool = pool.filter(u => u.id !== 'heal');
   const out = [];
+  // una fusione pronta prende sempre il primo posto
+  const fus = UPS.filter(u => u.fuse && !G.ups[u.id] && fuseReady(u));
+  if (fus.length) out.push(fus[(Math.random() * fus.length) | 0]);
   while (out.length < 3 && pool.length) { const u = weightedPick(pool); out.push(u); pool = pool.filter(x => x !== u); }
   return out;
 }
@@ -1550,9 +1859,12 @@ function renderChoices() {
   G.choices.forEach((u, i) => {
     const have = G.ups[u.id] || 0;
     const b = document.createElement('button');
-    b.className = 'card r' + u.r; b.id = 'card' + i;
-    b.innerHTML = `<div class="top"><span class="glyph">${ICON[u.cat]}</span><span class="rar">${RAR[u.r]}</span></div>
-      <h3></h3><p></p><span class="lvl">${u.max >= 99 ? (have ? 'Già preso ' + have + (have === 1 ? ' volta' : ' volte') : 'Nuovo') : 'Livello ' + have + ' → ' + (have + 1) + ' di ' + u.max}</span><span class="key">${i + 1}</span>`;
+    b.className = 'card r' + u.r + (u.fuse ? ' fuse' : ''); b.id = 'card' + i;
+    const lvTxt = u.fuse ? u.fuse.map(id => UPS.find(x => x.id === id).name).join(' + ')
+      : u.max >= 99 ? (have ? 'Già preso ' + have + (have === 1 ? ' volta' : ' volte') : 'Nuovo') : 'Livello ' + have + ' → ' + (have + 1) + ' di ' + u.max;
+    b.innerHTML = `<div class="top"><span class="glyph">${ICON[u.icon || u.cat]}</span><span class="rar">${RAR[u.r]}</span></div>
+      <h3></h3><p></p><span class="lvl"></span><span class="key">${i + 1}</span>`;
+    b.querySelector('.lvl').textContent = lvTxt;
     b.querySelector('h3').textContent = u.name; b.querySelector('p').textContent = u.desc();
     b.addEventListener('click', () => pickUpgrade(i));
     wrap.appendChild(b);
@@ -1582,7 +1894,8 @@ function resetRun() {
   Object.assign(G, { t: 0, wave: 0, kills: 0, runSeeds: 0, enemies: [], shots: [], eshots: [], parts: [], texts: [], fx: [], queue: [],
     spawnCd: 0, waveActive: false, endT: 0, fireCd: .5, rootCd: 3, aim: -Math.PI / 2, cast: 0, shake: 0, banner: null, ups: {}, rerolls: lv('reroll'), dmgDone: 0,
     sap: 15 * lv('sap'), treeLv: 1, evolveOpen: false, shield: 0, novaCd: 6,
-    spiritCd: 1, sunCd: 4, beeCd: 4, starCd: 1, shotCount: 0, worldReturn: 'play', worldPower: null });
+    spiritCd: 1, sunCd: 4, beeCd: 4, starCd: 1, shotCount: 0, worldReturn: 'play', worldPower: null,
+    meteors: [], owlCd: 3, quakeCd: 6, tempCd: 1, wrath: 0, wrathT: 0, worldChoices: [] });
   for (const k in hudCache) delete hudCache[k];
 }
 function newRun() {
@@ -1611,7 +1924,7 @@ function openPause() {
   if (G.state !== 'play') return;
   G.state = 'pause';
   const st = $('#pStats'); st.innerHTML = '';
-  const rows = [['Livello albero', G.treeLv + ' di ' + TREE_LV.length], ['Danno', Math.round(P.dmg)], ['Semi per colpo', P.multi], ['Lanci al secondo', P.rate.toFixed(2).replace('.', ',')], ['Gittata', Math.round(P.range)], ['Armatura', P.armor], ['Vita al secondo', P.regen.toFixed(1).replace('.', ',')]];
+  const rows = [['Livello albero', G.treeLv + ' di ' + TREE_LV.length], ['Elemento', P.aurora ? 'Tutti' : P.elem ? ELEM[P.elem].name + ' ' + elLv(P.elem) : 'Nessuno'], ['Danno', Math.round(P.dmg)], ['Semi per colpo', P.multi], ['Lanci al secondo', P.rate.toFixed(2).replace('.', ',')], ['Gittata', Math.round(P.range)], ['Armatura', P.armor], ['Vita al secondo', P.regen.toFixed(1).replace('.', ',')]];
   for (const [l, v] of rows) { const d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<span class="label"></span><b></b>'; d.firstChild.textContent = l; d.lastChild.textContent = v; st.appendChild(d); }
   const t = $('#pUps'); t.innerHTML = '';
   const ids = Object.keys(G.ups);
@@ -1654,10 +1967,11 @@ function openWorld() {
   G.worldReturn = G.state === 'choose' ? 'choose' : 'play';
   G.state = 'world';
   const wrap = $('#worldCards'); wrap.innerHTML = '';
-  WORLD.forEach((u, i) => {
+  G.worldChoices = WORLD.slice().sort(() => Math.random() - .5).slice(0, 3);
+  G.worldChoices.forEach((u, i) => {
     const b = document.createElement('button');
     b.className = 'card r3'; b.id = 'world' + i;
-    b.innerHTML = `<div class="top"><span class="glyph">${ICON[u.cat]}</span><span class="rar">Leggendario</span></div><h3></h3><p></p><span class="key">${i + 1}</span>`;
+    b.innerHTML = `<div class="top"><span class="glyph">${ICON[u.icon || u.cat]}</span><span class="rar">Leggendario</span></div><h3></h3><p></p><span class="key">${i + 1}</span>`;
     b.querySelector('h3').textContent = u.name; b.querySelector('p').textContent = u.desc;
     b.addEventListener('click', () => pickWorld(i));
     wrap.appendChild(b);
@@ -1666,7 +1980,7 @@ function openWorld() {
 }
 function pickWorld(i) {
   if (G.state !== 'world' || $('#world').hidden) return;
-  const u = WORLD[i]; if (!u) return;
+  const u = G.worldChoices[i]; if (!u) return;
   u.apply(); G.worldPower = u.id;
   G.state = G.worldReturn;
   if (G.state === 'choose') { show('#choose'); renderChoices(); } else show(null);
